@@ -5,7 +5,13 @@ const app = require("./app");
 const env = require("./config/env");
 const { connectDB } = require("./config/db");
 const { connectRedis, getRedisClient } = require("./config/redis");
-const { connectKafkaProducer, disconnectKafkaProducer } = require("./config/kafka");
+const {
+  connectKafkaProducer,
+  connectKafkaConsumer,
+  disconnectKafkaProducer,
+  disconnectKafkaConsumer,
+} = require("./config/kafka");
+const { handleCustomerProvisioned, handleAgentProvisioned } = require("./events/authEvents");
 const logger = require("./utils/logger");
 
 let server;
@@ -17,6 +23,20 @@ const start = async () => {
     await connectKafkaProducer({
       clientId: env.kafkaClientId,
       brokers: env.kafkaBrokers,
+    });
+    await connectKafkaConsumer({
+      clientId: env.kafkaClientId,
+      brokers: env.kafkaBrokers,
+      groupId: `${env.kafkaClientId}-auth`,
+      topics: ["customer.provisioned", "agent.provisioned"],
+      onMessage: async (topic, payload) => {
+        if (topic === "customer.provisioned") {
+          await handleCustomerProvisioned(payload);
+        }
+        if (topic === "agent.provisioned") {
+          await handleAgentProvisioned(payload);
+        }
+      },
     });
 
     server = http.createServer(app);
@@ -56,6 +76,11 @@ const shutdown = async (signal) => {
   } catch (error) {
     logger.warn(`Kafka close warning: ${error.message}`);
   }
+  try {
+    await disconnectKafkaConsumer();
+  } catch (error) {
+    logger.warn(`Kafka consumer close warning: ${error.message}`);
+  }
 
   process.exit(0);
 };
@@ -64,4 +89,3 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 start();
-

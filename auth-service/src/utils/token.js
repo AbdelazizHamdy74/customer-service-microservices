@@ -1,11 +1,13 @@
 const { randomUUID } = require("crypto");
 const jwt = require("jsonwebtoken");
 
-const createAccessToken = ({ userId, role, tokenVersion }, secret, expiresIn) =>
+const createAccessToken = ({ userId, role, tokenVersion, userType, linkedId }, secret, expiresIn) =>
   jwt.sign(
     {
       sub: userId,
       role,
+      userType,
+      linkedId,
       tokenVersion,
       type: "access",
     },
@@ -13,12 +15,14 @@ const createAccessToken = ({ userId, role, tokenVersion }, secret, expiresIn) =>
     { expiresIn }
   );
 
-const createRefreshToken = ({ userId, role, tokenVersion }, secret, expiresIn) => {
+const createRefreshToken = ({ userId, role, tokenVersion, userType, linkedId }, secret, expiresIn) => {
   const jti = randomUUID();
   const token = jwt.sign(
     {
       sub: userId,
       role,
+      userType,
+      linkedId,
       tokenVersion,
       jti,
       type: "refresh",
@@ -37,4 +41,3 @@ module.exports = {
   createRefreshToken,
   verifyToken,
 };
-

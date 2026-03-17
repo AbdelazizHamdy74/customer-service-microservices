@@ -1,8 +1,8 @@
 const jwt = require("jsonwebtoken");
 
+const env = require("../config/env");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
-const User = require("../models/User");
 
 const requireAuth = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization || "";
@@ -10,31 +10,30 @@ const requireAuth = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, "Authorization token is required");
   }
 
-  const accessToken = authHeader.split(" ")[1];
+  const token = authHeader.split(" ")[1];
+
   let payload;
   try {
-    payload = jwt.verify(accessToken, process.env.JWT_ACCESS_SECRET);
+    payload = jwt.verify(token, env.jwtAccessSecret);
   } catch (error) {
     throw new ApiError(401, "Invalid or expired access token");
   }
 
-  const user = await User.findById(payload.sub).select("_id role isActive tokenVersion");
-  if (!user || !user.isActive) {
-    throw new ApiError(401, "User not found or inactive");
-  }
-
-  if (payload.tokenVersion !== user.tokenVersion) {
-    throw new ApiError(401, "Session is outdated. Please login again");
-  }
-
   req.user = {
-    id: user.id,
-    role: user.role,
+    id: payload.sub,
+    role: payload.role,
+    userType: payload.userType,
+    linkedId: payload.linkedId,
   };
+
   next();
 });
 
-module.exports = {
-  requireAuth,
+const requireRoles = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+  next();
 };
 
+module.exports = { requireAuth, requireRoles };

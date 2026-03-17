@@ -3,6 +3,7 @@ const express = require("express");
 const morgan = require("morgan");
 
 const agentRoutes = require("./routes/agentRoutes");
+const internalRoutes = require("./routes/internalRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -21,6 +22,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({ success: true, service: "user-service" });
 });
 
+app.use("/api/v1/internal", internalRoutes);
 app.use("/api/v1/agents", agentRoutes);
 
 app.use(notFound);

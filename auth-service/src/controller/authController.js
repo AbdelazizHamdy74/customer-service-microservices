@@ -12,6 +12,8 @@ const {
   validateLoginPayload,
   validateForgotPasswordPayload,
   validateResetPasswordPayload,
+  validateInviteCustomerPayload,
+  validateInviteAgentPayload,
 } = require("../utils/validators/authValidator");
 
 const persistRefreshToken = async (refreshToken, jti, userId, tokenVersion) => {
@@ -35,6 +37,8 @@ const issueTokens = async (user) => {
   const payload = {
     userId: user.id,
     role: user.role,
+    userType: user.userType,
+    linkedId: user.linkedId,
     tokenVersion: user.tokenVersion,
   };
 
@@ -83,8 +87,115 @@ const login = asyncHandler(async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        userType: user.userType,
+        linkedId: user.linkedId,
       },
       ...tokens,
+    },
+  });
+});
+
+const INVITE_TOKEN_TTL_MS = Math.max(1, env.inviteTokenTtlMinutes || 10) * 60 * 1000;
+
+const inviteCustomer = asyncHandler(async (req, res) => {
+  const errors = validateInviteCustomerPayload(req.body);
+  if (errors.length) {
+    throw new ApiError(400, errors.join(", "));
+  }
+
+  const email = req.body.email.toLowerCase();
+  const existing = await User.findOne({ email });
+  if (existing) {
+    throw new ApiError(409, "Email already in use");
+  }
+
+  const rawInviteToken = generateRandomToken();
+  const user = new User({
+    name: `${req.body.firstName} ${req.body.lastName}`.trim(),
+    email,
+    password: generateRandomToken(16),
+    role: "CUSTOMER",
+    userType: "CUSTOMER",
+    isActive: false,
+  });
+  user.resetPasswordToken = sha256(rawInviteToken);
+  user.resetPasswordExpires = new Date(Date.now() + INVITE_TOKEN_TTL_MS);
+  await user.save();
+
+  await publishEvent("customer.invited", {
+    authUserId: user.id,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
+    email,
+    phone: req.body.phone,
+    address: req.body.address,
+    status: "ACTIVE",
+    createdBy: req.user?.id || null,
+    inviteToken: rawInviteToken,
+    inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Customer invited successfully",
+    data: {
+      userId: user.id,
+      inviteToken: rawInviteToken,
+      inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
+    },
+  });
+});
+
+const inviteAgent = asyncHandler(async (req, res) => {
+  const errors = validateInviteAgentPayload(req.body);
+  if (errors.length) {
+    throw new ApiError(400, errors.join(", "));
+  }
+
+  const email = req.body.email.toLowerCase();
+  const existing = await User.findOne({ email });
+  if (existing) {
+    throw new ApiError(409, "Email already in use");
+  }
+
+  const role = req.body.role ? req.body.role.toUpperCase() : "AGENT";
+  const status = req.body.status ? req.body.status.toUpperCase() : "ACTIVE";
+  const rawInviteToken = generateRandomToken();
+
+  const user = new User({
+    name: `${req.body.firstName} ${req.body.lastName}`.trim(),
+    email,
+    password: generateRandomToken(16),
+    role,
+    userType: "AGENT",
+    isActive: false,
+  });
+  user.resetPasswordToken = sha256(rawInviteToken);
+  user.resetPasswordExpires = new Date(Date.now() + INVITE_TOKEN_TTL_MS);
+  await user.save();
+
+  await publishEvent("agent.invited", {
+    authUserId: user.id,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
+    email,
+    phone: req.body.phone,
+    role,
+    status,
+    team: req.body.team,
+    skills: req.body.skills,
+    createdBy: req.user?.id || null,
+    inviteToken: rawInviteToken,
+    inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Agent invited successfully",
+    data: {
+      userId: user.id,
+      inviteToken: rawInviteToken,
+      inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
     },
   });
 });
@@ -204,6 +315,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 
   user.password = req.body.newPassword;
+  user.isActive = true;
   user.resetPasswordToken = null;
   user.resetPasswordExpires = null;
   user.tokenVersion += 1;
@@ -226,5 +338,6 @@ module.exports = {
   refreshToken,
   forgotPassword,
   resetPassword,
+  inviteCustomer,
+  inviteAgent,
 };
-

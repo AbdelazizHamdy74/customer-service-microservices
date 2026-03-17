@@ -12,6 +12,8 @@ Implemented now:
 
 1. `Auth Service`
 2. `Customer Service`
+3. `User Service`
+4. `Email Service`
 
 ---
 
@@ -25,12 +27,18 @@ Main APIs:
 - `POST /api/v1/auth/refresh-token`
 - `POST /api/v1/auth/forgot-password`
 - `POST /api/v1/auth/reset-password`
+- `POST /api/v1/auth/invite/customer` (Admin/Supervisor)
+- `POST /api/v1/auth/invite/agent` (Admin/Supervisor)
 
 Technical notes:
 
 - Uses `asyncHandler` for all controllers.
 - Stores refresh-token sessions in Redis.
-- Publishes Kafka events (`auth.login`, `auth.logout`, `auth.forgot-password`, `auth.password-reset`).
+- Publishes Kafka events:
+  - `auth.login`, `auth.logout`, `auth.forgot-password`, `auth.password-reset`
+  - `customer.invited`, `agent.invited`
+- Consumes Kafka events:
+  - `customer.provisioned`, `agent.provisioned`
 - Structured folders: `config`, `controller`, `models`, `routes`, `middleware`, `utils`.
 
 ### 2) Customer Service (`customer-service`)
@@ -45,10 +53,50 @@ Main APIs:
 Technical notes:
 
 - Uses `asyncHandler` for all controllers.
-- JWT-protected routes through middleware.
+- JWT-protected routes with role-based access.
 - Redis caching for `getCustomer` and search results.
-- Publishes Kafka events (`customer.created`, `customer.updated`, `customer.deleted`).
+- Publishes Kafka events (`customer.created`, `customer.updated`, `customer.deleted`, `customer.provisioned`).
+- Consumes Kafka events: `customer.invited`.
 - Structured folders: `config`, `controller`, `models`, `routes`, `middleware`, `utils`.
+
+### 3) User Service (`user-service`)
+Main APIs:
+
+- `POST /api/v1/agents` (create agent)
+- `PUT /api/v1/agents/:id` (update agent)
+- `DELETE /api/v1/agents/:id` (delete agent)
+- `GET /api/v1/agents/:id` (agent details)
+- `PUT /api/v1/agents/:id/role` (assign role)
+- `GET /api/v1/agents/:id/performance` (agent performance)
+
+Technical notes:
+
+- JWT-protected routes with role-based access.
+- Publishes Kafka events (`agent.created`, `agent.updated`, `agent.deleted`, `agent.provisioned`).
+- Consumes Kafka events: `agent.invited`.
+
+### 4) Email Service (`email-service`)
+Purpose:
+
+- Sends real invite emails to Customers and Agents using **Brevo**.
+
+Technical notes:
+
+- Consumes Kafka events: `customer.invited`, `agent.invited`.
+- Uses `BREVO_API_KEY` to send email.
+
+---
+
+## Invite Flow (Kafka)
+
+1. Admin invites a Customer/Agent via Auth Service.
+2. Auth Service creates a disabled Auth user with a reset token.
+3. Auth Service publishes `customer.invited` or `agent.invited`.
+4. Customer/User Service consumes the event and creates the profile.
+5. Customer/User Service publishes `customer.provisioned` or `agent.provisioned`.
+6. Auth Service consumes provisioned event and links `linkedId`.
+7. Email Service consumes invite event and sends the real email.
+8. User sets password via `POST /api/v1/auth/reset-password` (account becomes active).
 
 ---
 
@@ -72,6 +120,21 @@ Customer-Service-System/
       routes/
       middleware/
       utils/
+  user-service/
+    src/
+      config/
+      controller/
+      models/
+      routes/
+      middleware/
+      utils/
+  email-service/
+    src/
+      config/
+      events/
+      services/
+      templates/
+      utils/
 ```
 
 ---
@@ -80,12 +143,14 @@ Customer-Service-System/
 
 Each service is standalone.
 
-1. Copy `.env.example` to `.env` inside each service folder.
+1. Copy `.env.example` to `.env` inside each service folder (or edit `.env`).
 2. Install dependencies per service:
 
 ```bash
 cd auth-service && npm install
 cd ../customer-service && npm install
+cd ../user-service && npm install
+cd ../email-service && npm install
 ```
 
 3. Run each service:
@@ -93,20 +158,13 @@ cd ../customer-service && npm install
 ```bash
 cd auth-service && npm run dev
 cd ../customer-service && npm run dev
+cd ../user-service && npm run dev
+cd ../email-service && npm run dev
 ```
 
 ---
 
 ## Future Features (Planned Services)
-
-### User Service
-
-- `createAgent`
-- `updateAgent`
-- `deleteAgent`
-- `getAgent`
-- `assignRole`
-- `agentPerformance`
 
 ### Ticket Service
 

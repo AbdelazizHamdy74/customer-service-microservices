@@ -82,6 +82,13 @@ const agentSchema = new mongoose.Schema(
         default: null,
       },
     },
+    authUserId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     createdBy: {
       type: String,
       default: null,

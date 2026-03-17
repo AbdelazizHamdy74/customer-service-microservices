@@ -2,7 +2,15 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const requiredVars = ["PORT", "MONGO_URI", "JWT_ACCESS_SECRET", "REDIS_URL", "KAFKA_BROKERS", "KAFKA_CLIENT_ID"];
+const requiredVars = [
+  "PORT",
+  "MONGO_URI",
+  "JWT_ACCESS_SECRET",
+  "REDIS_URL",
+  "KAFKA_BROKERS",
+  "KAFKA_CLIENT_ID",
+  "INTERNAL_SERVICE_KEY",
+];
 
 for (const key of requiredVars) {
   if (!process.env[key]) {
@@ -18,5 +26,5 @@ module.exports = {
   redisUrl: process.env.REDIS_URL,
   kafkaBrokers: process.env.KAFKA_BROKERS.split(",").map((broker) => broker.trim()),
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
+  internalServiceKey: process.env.INTERNAL_SERVICE_KEY,
 };
-

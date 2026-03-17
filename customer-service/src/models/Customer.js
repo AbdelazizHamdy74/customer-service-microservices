@@ -37,6 +37,13 @@ const customerSchema = new mongoose.Schema(
       enum: ["ACTIVE", "INACTIVE"],
       default: "ACTIVE",
     },
+    authUserId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     createdBy: {
       type: String,
       default: null,
@@ -61,4 +68,3 @@ customerSchema.virtual("fullName").get(function fullName() {
 });
 
 module.exports = mongoose.model("Customer", customerSchema);
-

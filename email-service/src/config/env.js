@@ -4,12 +4,12 @@ dotenv.config();
 
 const requiredVars = [
   "PORT",
-  "MONGO_URI",
-  "JWT_ACCESS_SECRET",
-  "REDIS_URL",
   "KAFKA_BROKERS",
   "KAFKA_CLIENT_ID",
-  "INTERNAL_SERVICE_KEY",
+  "BREVO_API_KEY",
+  "EMAIL_FROM",
+  "FRONTEND_URL",
+  "OTP_TTL_MINUTES",
 ];
 
 for (const key of requiredVars) {
@@ -21,11 +21,10 @@ for (const key of requiredVars) {
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT),
-  mongoUri: process.env.MONGO_URI,
-  jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
-  redisUrl: process.env.REDIS_URL,
   kafkaBrokers: process.env.KAFKA_BROKERS.split(",").map((broker) => broker.trim()),
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
-  internalServiceKey: process.env.INTERNAL_SERVICE_KEY,
+  brevoApiKey: process.env.BREVO_API_KEY,
+  emailFrom: process.env.EMAIL_FROM,
+  frontendUrl: process.env.FRONTEND_URL,
+  otpTtlMinutes: Number(process.env.OTP_TTL_MINUTES),
 };
-

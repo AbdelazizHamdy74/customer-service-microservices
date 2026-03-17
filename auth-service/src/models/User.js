@@ -23,8 +23,17 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["ADMIN", "SUPERVISOR", "AGENT"],
+      enum: ["ADMIN", "SUPERVISOR", "AGENT", "CUSTOMER"],
       default: "AGENT",
+    },
+    userType: {
+      type: String,
+      enum: ["AGENT", "CUSTOMER"],
+      default: "AGENT",
+    },
+    linkedId: {
+      type: String,
+      default: null,
     },
     isActive: {
       type: Boolean,
@@ -59,4 +68,3 @@ userSchema.methods.comparePassword = function comparePassword(candidatePassword)
 };
 
 module.exports = mongoose.model("User", userSchema);
-

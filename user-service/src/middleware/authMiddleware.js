@@ -22,6 +22,8 @@ const requireAuth = asyncHandler(async (req, res, next) => {
   req.user = {
     id: payload.sub,
     role: payload.role,
+    userType: payload.userType,
+    linkedId: payload.linkedId,
   };
 
   next();

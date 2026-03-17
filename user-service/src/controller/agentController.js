@@ -9,7 +9,15 @@ const {
   validateAssignRolePayload,
 } = require("../utils/validators/agentValidator");
 
+const STAFF_ROLES = ["ADMIN", "SUPERVISOR"];
+const isStaff = (user) => STAFF_ROLES.includes(user?.role);
+const isSelfAgent = (user, agentId) => user?.userType === "AGENT" && user?.linkedId === agentId;
+
 const createAgent = asyncHandler(async (req, res) => {
+  if (!isStaff(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
   const errors = validateCreateAgentPayload(req.body);
   if (errors.length) {
     throw new ApiError(400, errors.join(", "));
@@ -38,6 +46,10 @@ const createAgent = asyncHandler(async (req, res) => {
 });
 
 const updateAgent = asyncHandler(async (req, res) => {
+  if (!isStaff(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
   const errors = validateUpdateAgentPayload(req.body);
   if (errors.length) {
     throw new ApiError(400, errors.join(", "));
@@ -71,6 +83,10 @@ const updateAgent = asyncHandler(async (req, res) => {
 });
 
 const deleteAgent = asyncHandler(async (req, res) => {
+  if (!isStaff(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
   const agent = await Agent.findByIdAndDelete(req.params.id);
   if (!agent) {
     throw new ApiError(404, "Agent not found");
@@ -91,6 +107,11 @@ const deleteAgent = asyncHandler(async (req, res) => {
 });
 
 const getAgent = asyncHandler(async (req, res) => {
+  const isSelf = isSelfAgent(req.user, req.params.id);
+  if (!isSelf && !isStaff(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
   const cacheKey = `agent:${req.params.id}`;
   const cached = await getCache(cacheKey);
 
@@ -117,6 +138,10 @@ const getAgent = asyncHandler(async (req, res) => {
 });
 
 const assignRole = asyncHandler(async (req, res) => {
+  if (!isStaff(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
   const errors = validateAssignRolePayload(req.body);
   if (errors.length) {
     throw new ApiError(400, errors.join(", "));
@@ -147,6 +172,11 @@ const assignRole = asyncHandler(async (req, res) => {
 });
 
 const agentPerformance = asyncHandler(async (req, res) => {
+  const isSelf = isSelfAgent(req.user, req.params.id);
+  if (!isSelf && !isStaff(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
   const cacheKey = `agent:performance:${req.params.id}`;
   const cached = await getCache(cacheKey);
 
@@ -197,6 +227,61 @@ const agentPerformance = asyncHandler(async (req, res) => {
   });
 });
 
+const createAgentInternal = asyncHandler(async (req, res) => {
+  const errors = validateCreateAgentPayload(req.body);
+  if (errors.length) {
+    throw new ApiError(400, errors.join(", "));
+  }
+
+  if (!req.body.authUserId) {
+    throw new ApiError(400, "authUserId is required");
+  }
+
+  const payload = {
+    ...req.body,
+    email: req.body.email ? req.body.email.toLowerCase() : undefined,
+  };
+  if (payload.role) payload.role = payload.role.toUpperCase();
+  if (payload.status) payload.status = payload.status.toUpperCase();
+
+  const agent = await Agent.create({
+    ...payload,
+    authUserId: req.body.authUserId,
+    createdBy: req.body.createdBy || "auth-service",
+  });
+
+  await publishEvent("agent.created", {
+    agentId: agent.id,
+    createdBy: req.body.createdBy || "auth-service",
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Agent created successfully",
+    data: agent,
+  });
+});
+
+const deleteAgentInternal = asyncHandler(async (req, res) => {
+  const agent = await Agent.findByIdAndDelete(req.params.id);
+  if (!agent) {
+    throw new ApiError(404, "Agent not found");
+  }
+
+  await deleteCache(`agent:${agent.id}`);
+  await deleteCache(`agent:performance:${agent.id}`);
+
+  await publishEvent("agent.deleted", {
+    agentId: agent.id,
+    deletedBy: "auth-service",
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Agent deleted successfully",
+  });
+});
+
 module.exports = {
   createAgent,
   updateAgent,
@@ -204,4 +289,6 @@ module.exports = {
   getAgent,
   assignRole,
   agentPerformance,
+  createAgentInternal,
+  deleteAgentInternal,
 };

@@ -3,6 +3,7 @@ const express = require("express");
 const morgan = require("morgan");
 
 const customerRoutes = require("./routes/customerRoutes");
+const internalRoutes = require("./routes/internalRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -21,10 +22,10 @@ app.get("/health", (req, res) => {
   res.status(200).json({ success: true, service: "customer-service" });
 });
 
+app.use("/api/v1/internal", internalRoutes);
 app.use("/api/v1/customers", customerRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
 module.exports = app;
-

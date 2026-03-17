@@ -2,6 +2,7 @@ const cors = require("cors");
 const express = require("express");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
+const path = require("path");
 
 const authRoutes = require("./routes/authRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
@@ -23,10 +24,14 @@ app.get("/health", (req, res) => {
   res.status(200).json({ success: true, service: "auth-service" });
 });
 
+app.use(express.static(path.join(__dirname, "public")));
+app.get("/set-password", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "set-password.html"));
+});
+
 app.use("/api/v1/auth", authRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
 module.exports = app;
-
