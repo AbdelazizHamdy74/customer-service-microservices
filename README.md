@@ -14,6 +14,7 @@ Implemented now:
 2. `Customer Service`
 3. `User Service`
 4. `Email Service`
+5. `Ticket Service`
 
 ---
 
@@ -85,6 +86,28 @@ Technical notes:
 - Consumes Kafka events: `customer.invited`, `agent.invited`.
 - Uses `BREVO_API_KEY` to send email.
 
+### 5) Ticket Service (`ticket-service`)
+Main APIs:
+
+- `POST /api/v1/tickets` (create ticket)
+- `PUT /api/v1/tickets/:id` (update ticket)
+- `PUT /api/v1/tickets/:id/assign` (assign ticket)
+- `PUT /api/v1/tickets/:id/close` (close ticket)
+- `PUT /api/v1/tickets/:id/reopen` (reopen ticket)
+- `POST /api/v1/tickets/:id/comments` (add comment)
+- `GET /api/v1/tickets/:id/history` (ticket history)
+- `GET /api/v1/tickets` (list visible tickets)
+- `GET /api/v1/tickets/filter` (filter tickets)
+
+Technical notes:
+
+- Uses `asyncHandler` for all controllers.
+- JWT-protected routes with role-aware access for Admin/Supervisor/Agent/Customer.
+- Redis caching for ticket lists, filtered results, and ticket history.
+- Publishes Kafka events (`ticket.created`, `ticket.updated`, `ticket.assigned`, `ticket.closed`, `ticket.reopened`, `ticket.commented`).
+- Tracks ticket comments and audit history in the same document.
+- Supports ticket statuses: `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, `RESOLVED`, `CLOSED`.
+
 ---
 
 ## Invite Flow (Kafka)
@@ -128,6 +151,14 @@ Customer-Service-System/
       routes/
       middleware/
       utils/
+  ticket-service/
+    src/
+      config/
+      controller/
+      models/
+      routes/
+      middleware/
+      utils/
   email-service/
     src/
       config/
@@ -150,6 +181,7 @@ Each service is standalone.
 cd auth-service && npm install
 cd ../customer-service && npm install
 cd ../user-service && npm install
+cd ../ticket-service && npm install
 cd ../email-service && npm install
 ```
 
@@ -159,32 +191,13 @@ cd ../email-service && npm install
 cd auth-service && npm run dev
 cd ../customer-service && npm run dev
 cd ../user-service && npm run dev
+cd ../ticket-service && npm run dev
 cd ../email-service && npm run dev
 ```
 
 ---
 
 ## Future Features (Planned Services)
-
-### Ticket Service
-
-- `createTicket`
-- `updateTicket`
-- `assignTicket`
-- `closeTicket`
-- `reopenTicket`
-- `addComment`
-- `ticketHistory`
-- `getTickets`
-- `filterTickets`
-
-Ticket status values:
-
-- `OPEN`
-- `IN_PROGRESS`
-- `WAITING_CUSTOMER`
-- `RESOLVED`
-- `CLOSED`
 
 ### Notification Service
 
