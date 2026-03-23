@@ -173,6 +173,7 @@ const createTicket = asyncHandler(async (req, res) => {
   await invalidateTicketCaches(ticket.id);
   await publishEvent("ticket.created", {
     ticketId: ticket.id,
+    subject: ticket.subject,
     customerId: ticket.customerId,
     assignedAgentId: ticket.assignedAgentId,
     status: ticket.status,
@@ -283,6 +284,10 @@ const updateTicket = asyncHandler(async (req, res) => {
 
   await publishEvent("ticket.updated", {
     ticketId: ticket.id,
+    subject: ticket.subject,
+    customerId: ticket.customerId,
+    assignedAgentId: ticket.assignedAgentId,
+    status: ticket.status,
     updatedBy: req.user?.id || null,
     changedFields,
   });
@@ -333,9 +338,12 @@ const assignTicket = asyncHandler(async (req, res) => {
 
   await publishEvent("ticket.assigned", {
     ticketId: ticket.id,
+    subject: ticket.subject,
+    customerId: ticket.customerId,
     assignedAgentId: nextAssignedAgentId,
     assignedBy: req.user?.id || null,
     previousAssignedAgentId,
+    status: ticket.status,
   });
 
   res.status(200).json({
@@ -380,6 +388,10 @@ const closeTicket = asyncHandler(async (req, res) => {
 
   await publishEvent("ticket.closed", {
     ticketId: ticket.id,
+    subject: ticket.subject,
+    customerId: ticket.customerId,
+    assignedAgentId: ticket.assignedAgentId,
+    status: ticket.status,
     closedBy: req.user?.id || null,
     previousStatus,
   });
@@ -426,6 +438,10 @@ const reopenTicket = asyncHandler(async (req, res) => {
 
   await publishEvent("ticket.reopened", {
     ticketId: ticket.id,
+    subject: ticket.subject,
+    customerId: ticket.customerId,
+    assignedAgentId: ticket.assignedAgentId,
+    status: ticket.status,
     reopenedBy: req.user?.id || null,
     previousStatus,
   });
@@ -474,6 +490,11 @@ const addComment = asyncHandler(async (req, res) => {
 
   await publishEvent("ticket.commented", {
     ticketId: ticket.id,
+    subject: ticket.subject,
+    customerId: ticket.customerId,
+    assignedAgentId: ticket.assignedAgentId,
+    status: ticket.status,
+    commentPreview: comment.message.slice(0, 120),
     commentedBy: req.user?.id || null,
   });
 

@@ -15,6 +15,7 @@ Implemented now:
 3. `User Service`
 4. `Email Service`
 5. `Ticket Service`
+6. `Notification Service`
 
 ---
 
@@ -108,6 +109,26 @@ Technical notes:
 - Tracks ticket comments and audit history in the same document.
 - Supports ticket statuses: `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, `RESOLVED`, `CLOSED`.
 
+### 6) Notification Service (`notification-service`)
+Main APIs:
+
+- `GET /api/v1/notifications` (list notifications for current user or all for Admin/Supervisor)
+- `GET /api/v1/notifications/:id` (notification details)
+- `PATCH /api/v1/notifications/:id/read` (mark notification as read)
+- `PATCH /api/v1/notifications/read-all` (mark all visible notifications as read)
+- `POST /api/v1/notifications` (manual in-app notification)
+- `POST /api/v1/notifications/email` (send email notification and store it)
+- `POST /api/v1/notifications/sms` (send SMS notification and store it)
+- `POST /api/v1/notifications/ticket-update` (send ticket update notifications)
+
+Technical notes:
+
+- Stores every notification in MongoDB.
+- Consumes Kafka events from Auth, Customer, User, and Ticket services.
+- Automatically creates in-app notifications for system actions and ticket lifecycle updates.
+- Supports multi-channel delivery: `IN_APP`, `EMAIL`, and `SMS`.
+- Email uses **Brevo** when configured, while SMS supports `mock` mode or **Brevo SMS**.
+
 ---
 
 ## Invite Flow (Kafka)
@@ -159,6 +180,16 @@ Customer-Service-System/
       routes/
       middleware/
       utils/
+  notification-service/
+    src/
+      config/
+      controller/
+      events/
+      models/
+      routes/
+      middleware/
+      services/
+      utils/
   email-service/
     src/
       config/
@@ -182,6 +213,7 @@ cd auth-service && npm install
 cd ../customer-service && npm install
 cd ../user-service && npm install
 cd ../ticket-service && npm install
+cd ../notification-service && npm install
 cd ../email-service && npm install
 ```
 
@@ -192,19 +224,13 @@ cd auth-service && npm run dev
 cd ../customer-service && npm run dev
 cd ../user-service && npm run dev
 cd ../ticket-service && npm run dev
+cd ../notification-service && npm run dev
 cd ../email-service && npm run dev
 ```
 
 ---
 
 ## Future Features (Planned Services)
-
-### Notification Service
-
-- `sendEmail`
-- `sendSMS`
-- `sendNotification`
-- `sendTicketUpdate`
 
 ### Report Service
 
