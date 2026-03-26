@@ -16,6 +16,7 @@ Implemented now:
 4. `Email Service`
 5. `Ticket Service`
 6. `Notification Service`
+7. `Report Service`
 
 ---
 
@@ -129,6 +130,22 @@ Technical notes:
 - Supports multi-channel delivery: `IN_APP`, `EMAIL`, and `SMS`.
 - Email uses **Brevo** when configured, while SMS supports `mock` mode or **Brevo SMS**.
 
+### 7) Report Service (`report-service`)
+Main APIs:
+
+- `GET /api/v1/reports/tickets-per-day`
+- `GET /api/v1/reports/agent-performance`
+- `GET /api/v1/reports/customer-satisfaction`
+- `GET /api/v1/reports/ticket-status-report`
+
+Technical notes:
+
+- Builds reporting read-models from Kafka events only.
+- Consumes Kafka events from Customer, User, and Ticket services.
+- Stores ticket, agent, customer, and event projections in MongoDB.
+- Uses Redis caching for generated report responses.
+- Supports management access for operational reports and self-access for agent performance.
+
 ---
 
 ## Invite Flow (Kafka)
@@ -190,6 +207,16 @@ Customer-Service-System/
       middleware/
       services/
       utils/
+  report-service/
+    src/
+      config/
+      controller/
+      events/
+      models/
+      routes/
+      middleware/
+      services/
+      utils/
   email-service/
     src/
       config/
@@ -214,6 +241,7 @@ cd ../customer-service && npm install
 cd ../user-service && npm install
 cd ../ticket-service && npm install
 cd ../notification-service && npm install
+cd ../report-service && npm install
 cd ../email-service && npm install
 ```
 
@@ -225,19 +253,9 @@ cd ../customer-service && npm run dev
 cd ../user-service && npm run dev
 cd ../ticket-service && npm run dev
 cd ../notification-service && npm run dev
+cd ../report-service && npm run dev
 cd ../email-service && npm run dev
 ```
-
----
-
-## Future Features (Planned Services)
-
-### Report Service
-
-- `ticketsPerDay`
-- `agentPerformance`
-- `customerSatisfaction`
-- `ticketStatusReport`
 
 ---
 

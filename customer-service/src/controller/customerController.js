@@ -16,6 +16,20 @@ const isStaff = (user) => STAFF_ROLES.includes(user?.role);
 const isAdmin = (user) => ADMIN_ROLES.includes(user?.role);
 const isSelfCustomer = (user, customerId) =>
   user?.userType === "CUSTOMER" && user?.linkedId && user.linkedId === customerId;
+const buildCustomerEventPayload = (customer, extra = {}) => ({
+  customerId: customer.id,
+  authUserId: customer.authUserId || null,
+  firstName: customer.firstName,
+  lastName: customer.lastName,
+  fullName: customer.fullName || `${customer.firstName} ${customer.lastName}`.trim(),
+  email: customer.email || "",
+  phone: customer.phone,
+  address: customer.address,
+  status: customer.status,
+  createdAt: customer.createdAt,
+  updatedAt: customer.updatedAt,
+  ...extra,
+});
 
 const createCustomer = asyncHandler(async (req, res) => {
   if (!isStaff(req.user)) {
@@ -39,10 +53,7 @@ const createCustomer = asyncHandler(async (req, res) => {
   });
 
   await deleteByPattern("customer:search:*");
-  await publishEvent("customer.created", {
-    customerId: customer.id,
-    createdBy: req.user?.id || null,
-  });
+  await publishEvent("customer.created", buildCustomerEventPayload(customer, { createdBy: req.user?.id || null }));
 
   res.status(201).json({
     success: true,
@@ -85,10 +96,7 @@ const updateCustomer = asyncHandler(async (req, res) => {
   await deleteCache(`customer:${customer.id}`);
   await deleteByPattern("customer:search:*");
 
-  await publishEvent("customer.updated", {
-    customerId: customer.id,
-    updatedBy: req.user?.id || null,
-  });
+  await publishEvent("customer.updated", buildCustomerEventPayload(customer, { updatedBy: req.user?.id || null }));
 
   res.status(200).json({
     success: true,
@@ -110,10 +118,7 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   await deleteCache(`customer:${customer.id}`);
   await deleteByPattern("customer:search:*");
 
-  await publishEvent("customer.deleted", {
-    customerId: customer.id,
-    deletedBy: req.user?.id || null,
-  });
+  await publishEvent("customer.deleted", buildCustomerEventPayload(customer, { deletedBy: req.user?.id || null }));
 
   res.status(200).json({
     success: true,
@@ -231,10 +236,10 @@ const createCustomerInternal = asyncHandler(async (req, res) => {
   });
 
   await deleteByPattern("customer:search:*");
-  await publishEvent("customer.created", {
-    customerId: customer.id,
-    createdBy: req.body.createdBy || "auth-service",
-  });
+  await publishEvent(
+    "customer.created",
+    buildCustomerEventPayload(customer, { createdBy: req.body.createdBy || "auth-service" })
+  );
 
   res.status(201).json({
     success: true,
@@ -252,10 +257,7 @@ const deleteCustomerInternal = asyncHandler(async (req, res) => {
   await deleteCache(`customer:${customer.id}`);
   await deleteByPattern("customer:search:*");
 
-  await publishEvent("customer.deleted", {
-    customerId: customer.id,
-    deletedBy: "auth-service",
-  });
+  await publishEvent("customer.deleted", buildCustomerEventPayload(customer, { deletedBy: "auth-service" }));
 
   res.status(200).json({
     success: true,

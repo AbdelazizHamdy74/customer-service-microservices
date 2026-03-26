@@ -20,6 +20,28 @@ const REOPENABLE_STATUSES = ["RESOLVED", "CLOSED"];
 
 const isStaff = (user) => STAFF_ROLES.includes(user?.role);
 const isManagement = (user) => MANAGEMENT_ROLES.includes(user?.role);
+const calculateResolutionTimeMinutes = (ticket) => {
+  if (!ticket?.createdAt || !ticket?.closedAt) {
+    return 0;
+  }
+
+  return Number((((new Date(ticket.closedAt) - new Date(ticket.createdAt)) / 60000) || 0).toFixed(2));
+};
+const buildTicketEventPayload = (ticket, extra = {}) => ({
+  ticketId: ticket.id,
+  subject: ticket.subject,
+  customerId: ticket.customerId,
+  assignedAgentId: ticket.assignedAgentId,
+  status: ticket.status,
+  createdBy: ticket.createdBy || null,
+  lastUpdatedBy: ticket.lastUpdatedBy || null,
+  createdAt: ticket.createdAt,
+  updatedAt: ticket.updatedAt,
+  closedAt: ticket.closedAt,
+  totalComments: Array.isArray(ticket.comments) ? ticket.comments.length : 0,
+  totalHistoryEntries: Array.isArray(ticket.history) ? ticket.history.length : 0,
+  ...extra,
+});
 const getUserEntityIds = (user) => Array.from(new Set([user?.linkedId, user?.id].filter(Boolean)));
 const matchesUserEntityId = (value, user) => getUserEntityIds(user).includes(value);
 const buildUserEntityFilter = (field, user) => {
@@ -171,14 +193,7 @@ const createTicket = asyncHandler(async (req, res) => {
   });
 
   await invalidateTicketCaches(ticket.id);
-  await publishEvent("ticket.created", {
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    customerId: ticket.customerId,
-    assignedAgentId: ticket.assignedAgentId,
-    status: ticket.status,
-    createdBy: req.user?.id || null,
-  });
+  await publishEvent("ticket.created", buildTicketEventPayload(ticket, { createdBy: req.user?.id || null }));
 
   res.status(201).json({
     success: true,
@@ -282,15 +297,13 @@ const updateTicket = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
-  await publishEvent("ticket.updated", {
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    customerId: ticket.customerId,
-    assignedAgentId: ticket.assignedAgentId,
-    status: ticket.status,
-    updatedBy: req.user?.id || null,
-    changedFields,
-  });
+  await publishEvent(
+    "ticket.updated",
+    buildTicketEventPayload(ticket, {
+      updatedBy: req.user?.id || null,
+      changedFields,
+    })
+  );
 
   res.status(200).json({
     success: true,
@@ -336,15 +349,14 @@ const assignTicket = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
-  await publishEvent("ticket.assigned", {
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    customerId: ticket.customerId,
-    assignedAgentId: nextAssignedAgentId,
-    assignedBy: req.user?.id || null,
-    previousAssignedAgentId,
-    status: ticket.status,
-  });
+  await publishEvent(
+    "ticket.assigned",
+    buildTicketEventPayload(ticket, {
+      assignedAgentId: nextAssignedAgentId,
+      assignedBy: req.user?.id || null,
+      previousAssignedAgentId,
+    })
+  );
 
   res.status(200).json({
     success: true,
@@ -386,15 +398,14 @@ const closeTicket = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
-  await publishEvent("ticket.closed", {
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    customerId: ticket.customerId,
-    assignedAgentId: ticket.assignedAgentId,
-    status: ticket.status,
-    closedBy: req.user?.id || null,
-    previousStatus,
-  });
+  await publishEvent(
+    "ticket.closed",
+    buildTicketEventPayload(ticket, {
+      closedBy: req.user?.id || null,
+      previousStatus,
+      resolutionTimeMinutes: calculateResolutionTimeMinutes(ticket),
+    })
+  );
 
   res.status(200).json({
     success: true,
@@ -436,15 +447,14 @@ const reopenTicket = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
-  await publishEvent("ticket.reopened", {
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    customerId: ticket.customerId,
-    assignedAgentId: ticket.assignedAgentId,
-    status: ticket.status,
-    reopenedBy: req.user?.id || null,
-    previousStatus,
-  });
+  await publishEvent(
+    "ticket.reopened",
+    buildTicketEventPayload(ticket, {
+      reopenedBy: req.user?.id || null,
+      previousStatus,
+      reopenedAt: ticket.updatedAt,
+    })
+  );
 
   res.status(200).json({
     success: true,
@@ -488,15 +498,14 @@ const addComment = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
-  await publishEvent("ticket.commented", {
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    customerId: ticket.customerId,
-    assignedAgentId: ticket.assignedAgentId,
-    status: ticket.status,
-    commentPreview: comment.message.slice(0, 120),
-    commentedBy: req.user?.id || null,
-  });
+  await publishEvent(
+    "ticket.commented",
+    buildTicketEventPayload(ticket, {
+      commentPreview: comment.message.slice(0, 120),
+      commentedBy: req.user?.id || null,
+      commentedAt: comment.createdAt,
+    })
+  );
 
   res.status(201).json({
     success: true,

@@ -3,6 +3,24 @@ const { publishEvent } = require("../config/kafka");
 const { validateCreateAgentPayload } = require("../utils/validators/agentValidator");
 const logger = require("../utils/logger");
 
+const buildAgentEventPayload = (agent, extra = {}) => ({
+  agentId: agent.id,
+  authUserId: agent.authUserId || null,
+  firstName: agent.firstName,
+  lastName: agent.lastName,
+  fullName: agent.fullName || `${agent.firstName} ${agent.lastName}`.trim(),
+  email: agent.email || "",
+  phone: agent.phone,
+  role: agent.role,
+  status: agent.status,
+  team: agent.team || "",
+  skills: Array.isArray(agent.skills) ? agent.skills : [],
+  performance: agent.performance || {},
+  createdAt: agent.createdAt,
+  updatedAt: agent.updatedAt,
+  ...extra,
+});
+
 const handleAgentInvited = async (payload) => {
   const errors = validateCreateAgentPayload(payload || {});
   if (errors.length) {
@@ -34,10 +52,13 @@ const handleAgentInvited = async (payload) => {
     createdBy: payload.createdBy || "auth-service",
   });
 
-  await publishEvent("agent.provisioned", {
-    authUserId: payload.authUserId,
-    agentId: agent.id,
-  });
+  await publishEvent(
+    "agent.provisioned",
+    buildAgentEventPayload(agent, {
+      authUserId: payload.authUserId,
+      createdBy: payload.createdBy || "auth-service",
+    })
+  );
 
   logger.info(`agent.invited provisioned: ${agent.id}`);
 };

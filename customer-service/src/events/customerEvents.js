@@ -3,6 +3,21 @@ const { publishEvent } = require("../config/kafka");
 const { validateCreateCustomerPayload } = require("../utils/validators/customerValidator");
 const logger = require("../utils/logger");
 
+const buildCustomerEventPayload = (customer, extra = {}) => ({
+  customerId: customer.id,
+  authUserId: customer.authUserId || null,
+  firstName: customer.firstName,
+  lastName: customer.lastName,
+  fullName: customer.fullName || `${customer.firstName} ${customer.lastName}`.trim(),
+  email: customer.email || "",
+  phone: customer.phone,
+  address: customer.address,
+  status: customer.status,
+  createdAt: customer.createdAt,
+  updatedAt: customer.updatedAt,
+  ...extra,
+});
+
 const handleCustomerInvited = async (payload) => {
   const errors = validateCreateCustomerPayload(payload || {});
   if (errors.length) {
@@ -32,10 +47,13 @@ const handleCustomerInvited = async (payload) => {
     createdBy: payload.createdBy || "auth-service",
   });
 
-  await publishEvent("customer.provisioned", {
-    authUserId: payload.authUserId,
-    customerId: customer.id,
-  });
+  await publishEvent(
+    "customer.provisioned",
+    buildCustomerEventPayload(customer, {
+      authUserId: payload.authUserId,
+      createdBy: payload.createdBy || "auth-service",
+    })
+  );
 
   logger.info(`customer.invited provisioned: ${customer.id}`);
 };

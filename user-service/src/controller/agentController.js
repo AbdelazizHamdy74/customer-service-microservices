@@ -12,6 +12,23 @@ const {
 const STAFF_ROLES = ["ADMIN", "SUPERVISOR"];
 const isStaff = (user) => STAFF_ROLES.includes(user?.role);
 const isSelfAgent = (user, agentId) => user?.userType === "AGENT" && user?.linkedId === agentId;
+const buildAgentEventPayload = (agent, extra = {}) => ({
+  agentId: agent.id,
+  authUserId: agent.authUserId || null,
+  firstName: agent.firstName,
+  lastName: agent.lastName,
+  fullName: agent.fullName || `${agent.firstName} ${agent.lastName}`.trim(),
+  email: agent.email || "",
+  phone: agent.phone,
+  role: agent.role,
+  status: agent.status,
+  team: agent.team || "",
+  skills: Array.isArray(agent.skills) ? agent.skills : [],
+  performance: agent.performance || {},
+  createdAt: agent.createdAt,
+  updatedAt: agent.updatedAt,
+  ...extra,
+});
 
 const createAgent = asyncHandler(async (req, res) => {
   if (!isStaff(req.user)) {
@@ -33,10 +50,7 @@ const createAgent = asyncHandler(async (req, res) => {
 
   const agent = await Agent.create(payload);
 
-  await publishEvent("agent.created", {
-    agentId: agent.id,
-    createdBy: req.user?.id || null,
-  });
+  await publishEvent("agent.created", buildAgentEventPayload(agent, { createdBy: req.user?.id || null }));
 
   res.status(201).json({
     success: true,
@@ -70,10 +84,7 @@ const updateAgent = asyncHandler(async (req, res) => {
   await deleteCache(`agent:${agent.id}`);
   await deleteCache(`agent:performance:${agent.id}`);
 
-  await publishEvent("agent.updated", {
-    agentId: agent.id,
-    updatedBy: req.user?.id || null,
-  });
+  await publishEvent("agent.updated", buildAgentEventPayload(agent, { updatedBy: req.user?.id || null }));
 
   res.status(200).json({
     success: true,
@@ -95,10 +106,7 @@ const deleteAgent = asyncHandler(async (req, res) => {
   await deleteCache(`agent:${agent.id}`);
   await deleteCache(`agent:performance:${agent.id}`);
 
-  await publishEvent("agent.deleted", {
-    agentId: agent.id,
-    deletedBy: req.user?.id || null,
-  });
+  await publishEvent("agent.deleted", buildAgentEventPayload(agent, { deletedBy: req.user?.id || null }));
 
   res.status(200).json({
     success: true,
@@ -158,11 +166,7 @@ const assignRole = asyncHandler(async (req, res) => {
   await deleteCache(`agent:${agent.id}`);
   await deleteCache(`agent:performance:${agent.id}`);
 
-  await publishEvent("agent.role.assigned", {
-    agentId: agent.id,
-    role: agent.role,
-    assignedBy: req.user?.id || null,
-  });
+  await publishEvent("agent.role.assigned", buildAgentEventPayload(agent, { assignedBy: req.user?.id || null }));
 
   res.status(200).json({
     success: true,
@@ -250,10 +254,7 @@ const createAgentInternal = asyncHandler(async (req, res) => {
     createdBy: req.body.createdBy || "auth-service",
   });
 
-  await publishEvent("agent.created", {
-    agentId: agent.id,
-    createdBy: req.body.createdBy || "auth-service",
-  });
+  await publishEvent("agent.created", buildAgentEventPayload(agent, { createdBy: req.body.createdBy || "auth-service" }));
 
   res.status(201).json({
     success: true,
@@ -271,10 +272,7 @@ const deleteAgentInternal = asyncHandler(async (req, res) => {
   await deleteCache(`agent:${agent.id}`);
   await deleteCache(`agent:performance:${agent.id}`);
 
-  await publishEvent("agent.deleted", {
-    agentId: agent.id,
-    deletedBy: "auth-service",
-  });
+  await publishEvent("agent.deleted", buildAgentEventPayload(agent, { deletedBy: "auth-service" }));
 
   res.status(200).json({
     success: true,
