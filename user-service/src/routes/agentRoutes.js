@@ -4,6 +4,7 @@ const {
   updateAgent,
   deleteAgent,
   getAgent,
+  listAgents,
   assignRole,
   agentPerformance,
 } = require("../controller/agentController");
@@ -13,6 +14,8 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+router.get("/search", listAgents);
+router.get("/", listAgents);
 router.post("/", createAgent);
 router.get("/:id/performance", agentPerformance);
 router.put("/:id/role", assignRole);

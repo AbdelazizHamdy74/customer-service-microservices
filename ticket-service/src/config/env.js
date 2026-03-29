@@ -1,4 +1,4 @@
-const dotenv = require("dotenv");
+﻿const dotenv = require("dotenv");
 
 dotenv.config();
 
@@ -17,6 +17,13 @@ for (const key of requiredVars) {
   }
 }
 
+const defaultAllowedOrigins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:4000"];
+const parseAllowedOrigins = (value) =>
+  (value || defaultAllowedOrigins.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT),
@@ -25,4 +32,5 @@ module.exports = {
   redisUrl: process.env.REDIS_URL,
   kafkaBrokers: process.env.KAFKA_BROKERS.split(",").map((broker) => broker.trim()),
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
+  allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS),
 };

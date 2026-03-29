@@ -88,6 +88,7 @@ const appendHistory = (ticket, action, user, extra = {}) => {
 };
 
 const invalidateTicketCaches = async (ticketId) => {
+  await deleteCache(`ticket:${ticketId}`);
   await deleteCache(`ticket:history:${ticketId}`);
   await deleteByPattern("ticket:list:*");
   await deleteByPattern("ticket:filter:*");
@@ -514,6 +515,41 @@ const addComment = asyncHandler(async (req, res) => {
   });
 });
 
+const getTicket = asyncHandler(async (req, res) => {
+  const cacheKey = `ticket:${req.params.id}`;
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    const ticket = JSON.parse(cached);
+    if (!canAccessTicket(req.user, ticket)) {
+      throw new ApiError(403, "Insufficient permissions");
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Ticket fetched from cache",
+      data: ticket,
+    });
+  }
+
+  const ticket = await Ticket.findById(req.params.id);
+  if (!ticket) {
+    throw new ApiError(404, "Ticket not found");
+  }
+
+  if (!canAccessTicket(req.user, ticket)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
+  await setCache(cacheKey, JSON.stringify(ticket), 300);
+
+  res.status(200).json({
+    success: true,
+    message: "Ticket fetched successfully",
+    data: ticket,
+  });
+});
+
 const ticketHistory = asyncHandler(async (req, res) => {
   const ticket = await Ticket.findById(req.params.id);
   if (!ticket) {
@@ -685,6 +721,7 @@ module.exports = {
   closeTicket,
   reopenTicket,
   addComment,
+  getTicket,
   ticketHistory,
   getTickets,
   filterTickets,

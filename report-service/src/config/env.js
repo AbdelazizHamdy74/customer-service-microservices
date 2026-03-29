@@ -1,4 +1,4 @@
-const dotenv = require("dotenv");
+﻿const dotenv = require("dotenv");
 
 dotenv.config();
 
@@ -34,6 +34,12 @@ const defaultReportTopics = [
   "ticket.reopened",
   "ticket.commented",
 ];
+const defaultAllowedOrigins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:4000"];
+const parseAllowedOrigins = (value) =>
+  (value || defaultAllowedOrigins.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
@@ -47,4 +53,5 @@ module.exports = {
     .split(",")
     .map((topic) => topic.trim())
     .filter(Boolean),
+  allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS),
 };

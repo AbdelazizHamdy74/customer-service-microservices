@@ -67,8 +67,86 @@ const validateAssignRolePayload = (payload) => {
   return errors;
 };
 
+const validateAgentListQuery = (query = {}) => {
+  const errors = [];
+
+  if (query.page !== undefined && (!Number.isInteger(Number(query.page)) || Number(query.page) < 1)) {
+    errors.push("page must be a positive integer");
+  }
+
+  if (
+    query.limit !== undefined &&
+    (!Number.isInteger(Number(query.limit)) || Number(query.limit) < 1 || Number(query.limit) > 100)
+  ) {
+    errors.push("limit must be an integer between 1 and 100");
+  }
+
+  if (query.role !== undefined && (!query.role || !ROLES.includes(String(query.role).trim().toUpperCase()))) {
+    errors.push(`role must be one of: ${ROLES.join(", ")}`);
+  }
+
+  if (
+    query.status !== undefined &&
+    (!query.status || !STATUSES.includes(String(query.status).trim().toUpperCase()))
+  ) {
+    errors.push(`status must be one of: ${STATUSES.join(", ")}`);
+  }
+
+  if (query.team !== undefined && !String(query.team).trim()) {
+    errors.push("team must be a non-empty string");
+  }
+
+  if (query.skill !== undefined && !String(query.skill).trim()) {
+    errors.push("skill must be a non-empty string");
+  }
+
+  if (query.q !== undefined && !String(query.q).trim()) {
+    errors.push("q must be a non-empty string");
+  }
+
+  return errors;
+};
+
+const buildAgentSearchFilter = ({ q, role, status, team, skill } = {}) => {
+  const andConditions = [];
+
+  if (q) {
+    andConditions.push({
+      $or: [
+        { firstName: { $regex: q, $options: "i" } },
+        { lastName: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
+        { phone: { $regex: q, $options: "i" } },
+      ],
+    });
+  }
+
+  if (role) {
+    andConditions.push({ role: String(role).trim().toUpperCase() });
+  }
+
+  if (status) {
+    andConditions.push({ status: String(status).trim().toUpperCase() });
+  }
+
+  if (team) {
+    andConditions.push({ team: { $regex: String(team).trim(), $options: "i" } });
+  }
+
+  if (skill) {
+    andConditions.push({ skills: { $regex: String(skill).trim(), $options: "i" } });
+  }
+
+  if (andConditions.length === 0) return {};
+  if (andConditions.length === 1) return andConditions[0];
+
+  return { $and: andConditions };
+};
+
 module.exports = {
   validateCreateAgentPayload,
   validateUpdateAgentPayload,
   validateAssignRolePayload,
+  validateAgentListQuery,
+  buildAgentSearchFilter,
 };

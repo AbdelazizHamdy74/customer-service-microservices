@@ -1,4 +1,4 @@
-const dotenv = require("dotenv");
+﻿const dotenv = require("dotenv");
 
 dotenv.config();
 
@@ -18,6 +18,13 @@ for (const key of requiredVars) {
   }
 }
 
+const defaultAllowedOrigins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:4000"];
+const parseAllowedOrigins = (value) =>
+  (value || defaultAllowedOrigins.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT),
@@ -25,6 +32,7 @@ module.exports = {
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
   brevoApiKey: process.env.BREVO_API_KEY,
   emailFrom: process.env.EMAIL_FROM,
-  frontendUrl: process.env.FRONTEND_URL,
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:4200",
   otpTtlMinutes: Number(process.env.OTP_TTL_MINUTES),
+  allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS || process.env.FRONTEND_URL),
 };

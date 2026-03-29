@@ -6,6 +6,7 @@ const {
   closeTicket,
   reopenTicket,
   addComment,
+  getTicket,
   ticketHistory,
   getTickets,
   filterTickets,
@@ -19,6 +20,7 @@ router.use(requireAuth);
 router.get("/filter", filterTickets);
 router.get("/", getTickets);
 router.get("/:id/history", ticketHistory);
+router.get("/:id", getTicket);
 router.post("/", createTicket);
 router.put("/:id", updateTicket);
 router.put("/:id/assign", assignTicket);

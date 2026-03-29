@@ -1,4 +1,4 @@
-# Customer Service Management System (CSM)
+﻿# Customer Service Management System (CSM)
 
 Microservices starter for a **Customer Service Management System** using:
 
@@ -10,19 +10,42 @@ Microservices starter for a **Customer Service Management System** using:
 
 Implemented now:
 
-1. `Auth Service`
-2. `Customer Service`
-3. `User Service`
-4. `Email Service`
-5. `Ticket Service`
-6. `Notification Service`
-7. `Report Service`
+1. `API Gateway`
+2. `Auth Service`
+3. `Customer Service`
+4. `User Service`
+5. `Email Service`
+6. `Ticket Service`
+7. `Notification Service`
+8. `Report Service`
 
 ---
 
 ## Current Services
 
-### 1) Auth Service (`auth-service`)
+### 1) API Gateway (`API-Gateway`)
+Purpose:
+
+- Single entry point for the Angular frontend.
+- Proxies public API routes to the correct backend service.
+- Handles frontend CORS and exposes `GET /health`.
+
+Forwarded routes:
+
+- `/api/v1/auth` -> Auth Service
+- `/api/v1/customers` -> Customer Service
+- `/api/v1/agents` -> User Service
+- `/api/v1/tickets` -> Ticket Service
+- `/api/v1/notifications` -> Notification Service
+- `/api/v1/reports` -> Report Service
+
+Technical notes:
+
+- Runs by default on port `4000`.
+- Uses simple route-based proxying with Node.js core modules only.
+- Intended frontend base URL: `http://localhost:4000`.
+
+### 2) Auth Service (`auth-service`)
 Main APIs:
 
 - `POST /api/v1/auth/login`
@@ -42,9 +65,10 @@ Technical notes:
   - `customer.invited`, `agent.invited`
 - Consumes Kafka events:
   - `customer.provisioned`, `agent.provisioned`
+- Serves the legacy `set-password` HTML page.
 - Structured folders: `config`, `controller`, `models`, `routes`, `middleware`, `utils`.
 
-### 2) Customer Service (`customer-service`)
+### 3) Customer Service (`customer-service`)
 Main APIs:
 
 - `POST /api/v1/customers` (create customer)
@@ -62,9 +86,11 @@ Technical notes:
 - Consumes Kafka events: `customer.invited`.
 - Structured folders: `config`, `controller`, `models`, `routes`, `middleware`, `utils`.
 
-### 3) User Service (`user-service`)
+### 4) User Service (`user-service`)
 Main APIs:
 
+- `GET /api/v1/agents` (list agents with filters and pagination)
+- `GET /api/v1/agents/search` (search agents by `q`, `role`, `status`, `team`, `skill`)
 - `POST /api/v1/agents` (create agent)
 - `PUT /api/v1/agents/:id` (update agent)
 - `DELETE /api/v1/agents/:id` (delete agent)
@@ -75,10 +101,12 @@ Main APIs:
 Technical notes:
 
 - JWT-protected routes with role-based access.
+- Management-only listing and search for agents.
+- Redis caching for agent details, agent performance, and list/search results.
 - Publishes Kafka events (`agent.created`, `agent.updated`, `agent.deleted`, `agent.provisioned`).
 - Consumes Kafka events: `agent.invited`.
 
-### 4) Email Service (`email-service`)
+### 5) Email Service (`email-service`)
 Purpose:
 
 - Sends real invite emails to Customers and Agents using **Brevo**.
@@ -87,10 +115,13 @@ Technical notes:
 
 - Consumes Kafka events: `customer.invited`, `agent.invited`.
 - Uses `BREVO_API_KEY` to send email.
+- Uses `FRONTEND_URL` for invite/set-password links.
+- Exposes `GET /health` and allows frontend-origin CORS for local development.
 
-### 5) Ticket Service (`ticket-service`)
+### 6) Ticket Service (`ticket-service`)
 Main APIs:
 
+- `GET /api/v1/tickets/:id` (ticket details)
 - `POST /api/v1/tickets` (create ticket)
 - `PUT /api/v1/tickets/:id` (update ticket)
 - `PUT /api/v1/tickets/:id/assign` (assign ticket)
@@ -105,12 +136,12 @@ Technical notes:
 
 - Uses `asyncHandler` for all controllers.
 - JWT-protected routes with role-aware access for Admin/Supervisor/Agent/Customer.
-- Redis caching for ticket lists, filtered results, and ticket history.
+- Redis caching for ticket details, ticket lists, filtered results, and ticket history.
 - Publishes Kafka events (`ticket.created`, `ticket.updated`, `ticket.assigned`, `ticket.closed`, `ticket.reopened`, `ticket.commented`).
 - Tracks ticket comments and audit history in the same document.
 - Supports ticket statuses: `OPEN`, `IN_PROGRESS`, `WAITING_CUSTOMER`, `RESOLVED`, `CLOSED`.
 
-### 6) Notification Service (`notification-service`)
+### 7) Notification Service (`notification-service`)
 Main APIs:
 
 - `GET /api/v1/notifications` (list notifications for current user or all for Admin/Supervisor)
@@ -130,7 +161,7 @@ Technical notes:
 - Supports multi-channel delivery: `IN_APP`, `EMAIL`, and `SMS`.
 - Email uses **Brevo** when configured, while SMS supports `mock` mode or **Brevo SMS**.
 
-### 7) Report Service (`report-service`)
+### 8) Report Service (`report-service`)
 Main APIs:
 
 - `GET /api/v1/reports/tickets-per-day`
@@ -145,6 +176,24 @@ Technical notes:
 - Stores ticket, agent, customer, and event projections in MongoDB.
 - Uses Redis caching for generated report responses.
 - Supports management access for operational reports and self-access for agent performance.
+
+---
+
+## Frontend Readiness
+
+For the next Angular step, the backend is prepared with local-development CORS and a gateway entry point.
+
+Recommended setup:
+
+- Angular app origin: `http://localhost:4200`
+- API Gateway origin: `http://localhost:4000`
+- Angular should call the backend through the gateway base URL.
+
+Environment notes:
+
+- Set `CORS_ORIGINS` in each service to allow Angular and optional local gateway/browser origins.
+- Set `FRONTEND_URL=http://localhost:4200` for invite/reset-password links.
+- Keep the same `JWT_ACCESS_SECRET` across all JWT-protected services.
 
 ---
 
@@ -165,6 +214,11 @@ Technical notes:
 
 ```text
 Customer-Service-System/
+  API-Gateway/
+    src/
+      config/
+      middlewares/
+      utils/
   auth-service/
     src/
       config/
@@ -230,10 +284,10 @@ Customer-Service-System/
 
 ## Run Locally
 
-Each service is standalone.
+Each backend service is standalone, and the frontend should use the gateway.
 
-1. Copy `.env.example` to `.env` inside each service folder (or edit `.env`).
-2. Install dependencies per service:
+1. Edit `.env` inside each service folder as needed.
+2. Install dependencies per backend service:
 
 ```bash
 cd auth-service && npm install
@@ -245,7 +299,13 @@ cd ../report-service && npm install
 cd ../email-service && npm install
 ```
 
-3. Run each service:
+3. Start the API Gateway:
+
+```bash
+cd API-Gateway && npm run start
+```
+
+4. Run each backend service:
 
 ```bash
 cd auth-service && npm run dev
@@ -255,6 +315,12 @@ cd ../ticket-service && npm run dev
 cd ../notification-service && npm run dev
 cd ../report-service && npm run dev
 cd ../email-service && npm run dev
+```
+
+5. Point the Angular frontend to:
+
+```text
+http://localhost:4000
 ```
 
 ---

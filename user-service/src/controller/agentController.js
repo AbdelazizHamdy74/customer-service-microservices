@@ -2,15 +2,19 @@ const Agent = require("../models/Agent");
 const { publishEvent } = require("../config/kafka");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
-const { getCache, setCache, deleteCache } = require("../utils/cache");
+const { getCache, setCache, deleteCache, deleteByPattern } = require("../utils/cache");
 const {
   validateCreateAgentPayload,
   validateUpdateAgentPayload,
   validateAssignRolePayload,
+  validateAgentListQuery,
+  buildAgentSearchFilter,
 } = require("../utils/validators/agentValidator");
 
 const STAFF_ROLES = ["ADMIN", "SUPERVISOR"];
+const MANAGEMENT_ROLES = ["ADMIN", "SUPERVISOR"];
 const isStaff = (user) => STAFF_ROLES.includes(user?.role);
+const isManagement = (user) => MANAGEMENT_ROLES.includes(user?.role);
 const isSelfAgent = (user, agentId) => user?.userType === "AGENT" && user?.linkedId === agentId;
 const buildAgentEventPayload = (agent, extra = {}) => ({
   agentId: agent.id,
@@ -29,6 +33,17 @@ const buildAgentEventPayload = (agent, extra = {}) => ({
   updatedAt: agent.updatedAt,
   ...extra,
 });
+const getPagination = (query = {}) => {
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(query.limit) || 20));
+
+  return { page, limit };
+};
+const invalidateAgentCaches = async (agentId) => {
+  await deleteCache(`agent:${agentId}`);
+  await deleteCache(`agent:performance:${agentId}`);
+  await deleteByPattern("agent:list:*");
+};
 
 const createAgent = asyncHandler(async (req, res) => {
   if (!isStaff(req.user)) {
@@ -49,6 +64,8 @@ const createAgent = asyncHandler(async (req, res) => {
   if (payload.status) payload.status = payload.status.toUpperCase();
 
   const agent = await Agent.create(payload);
+
+  await deleteByPattern("agent:list:*");
 
   await publishEvent("agent.created", buildAgentEventPayload(agent, { createdBy: req.user?.id || null }));
 
@@ -81,8 +98,7 @@ const updateAgent = asyncHandler(async (req, res) => {
   Object.assign(agent, updates);
   await agent.save();
 
-  await deleteCache(`agent:${agent.id}`);
-  await deleteCache(`agent:performance:${agent.id}`);
+  await invalidateAgentCaches(agent.id);
 
   await publishEvent("agent.updated", buildAgentEventPayload(agent, { updatedBy: req.user?.id || null }));
 
@@ -103,8 +119,7 @@ const deleteAgent = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Agent not found");
   }
 
-  await deleteCache(`agent:${agent.id}`);
-  await deleteCache(`agent:performance:${agent.id}`);
+  await invalidateAgentCaches(agent.id);
 
   await publishEvent("agent.deleted", buildAgentEventPayload(agent, { deletedBy: req.user?.id || null }));
 
@@ -145,6 +160,73 @@ const getAgent = asyncHandler(async (req, res) => {
   });
 });
 
+const listAgents = asyncHandler(async (req, res) => {
+  if (!isManagement(req.user)) {
+    throw new ApiError(403, "Insufficient permissions");
+  }
+
+  const errors = validateAgentListQuery(req.query);
+  if (errors.length) {
+    throw new ApiError(400, errors.join(", "));
+  }
+
+  const { page, limit } = getPagination(req.query);
+  const searchQuery = {
+    q: req.query.q || "",
+    role: req.query.role || "",
+    status: req.query.status || "",
+    team: req.query.team || "",
+    skill: req.query.skill || "",
+    page,
+    limit,
+  };
+
+  const cacheKey = `agent:list:${JSON.stringify(searchQuery)}`;
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return res.status(200).json({
+      success: true,
+      message: "Agents fetched from cache",
+      data: JSON.parse(cached),
+    });
+  }
+
+  const filter = buildAgentSearchFilter(req.query);
+  const [agents, total] = await Promise.all([
+    Agent.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Agent.countDocuments(filter),
+  ]);
+
+  const result = {
+    items: agents,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+    filters: {
+      q: searchQuery.q,
+      role: searchQuery.role,
+      status: searchQuery.status,
+      team: searchQuery.team,
+      skill: searchQuery.skill,
+    },
+  };
+
+  await setCache(cacheKey, JSON.stringify(result), 120);
+
+  res.status(200).json({
+    success: true,
+    message: "Agents fetched successfully",
+    data: result,
+  });
+});
+
 const assignRole = asyncHandler(async (req, res) => {
   if (!isStaff(req.user)) {
     throw new ApiError(403, "Insufficient permissions");
@@ -163,8 +245,7 @@ const assignRole = asyncHandler(async (req, res) => {
   agent.role = req.body.role.toUpperCase();
   await agent.save();
 
-  await deleteCache(`agent:${agent.id}`);
-  await deleteCache(`agent:performance:${agent.id}`);
+  await invalidateAgentCaches(agent.id);
 
   await publishEvent("agent.role.assigned", buildAgentEventPayload(agent, { assignedBy: req.user?.id || null }));
 
@@ -254,6 +335,7 @@ const createAgentInternal = asyncHandler(async (req, res) => {
     createdBy: req.body.createdBy || "auth-service",
   });
 
+  await deleteByPattern("agent:list:*");
   await publishEvent("agent.created", buildAgentEventPayload(agent, { createdBy: req.body.createdBy || "auth-service" }));
 
   res.status(201).json({
@@ -285,6 +367,7 @@ module.exports = {
   updateAgent,
   deleteAgent,
   getAgent,
+  listAgents,
   assignRole,
   agentPerformance,
   createAgentInternal,

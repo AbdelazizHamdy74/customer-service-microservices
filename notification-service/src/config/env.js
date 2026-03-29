@@ -1,4 +1,4 @@
-const dotenv = require("dotenv");
+﻿const dotenv = require("dotenv");
 
 dotenv.config();
 
@@ -33,6 +33,12 @@ const defaultNotificationTopics = [
   "ticket.reopened",
   "ticket.commented",
 ];
+const defaultAllowedOrigins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:4000"];
+const parseAllowedOrigins = (value) =>
+  (value || defaultAllowedOrigins.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
@@ -49,4 +55,5 @@ module.exports = {
   emailFrom: process.env.EMAIL_FROM || "",
   smsProvider: (process.env.SMS_PROVIDER || "mock").toUpperCase(),
   smsFrom: process.env.SMS_FROM || "",
+  allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS),
 };

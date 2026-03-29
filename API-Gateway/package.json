@@ -1,0 +1,12 @@
+﻿{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "API gateway for Customer Service Management System",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "check": "node -c src/server.js && node -c src/app.js && node -c src/config/env.js && node -c src/config/routes.js && node -c src/middlewares/proxy.middleware.js && node -c src/utils/proxyRequest.js"
+  },
+  "license": "MIT"
+}
