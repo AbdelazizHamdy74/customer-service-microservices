@@ -24,6 +24,7 @@ const agents = [
       lastActiveAt: new Date(),
       lastUpdatedAt: new Date(),
     },
+    authUserId: "admin@csm.com", // Plain login: Password123 - Linked to auth-service ADMIN user
     createdBy: "seed-script",
   },
   {
@@ -44,6 +45,7 @@ const agents = [
       lastActiveAt: new Date(),
       lastUpdatedAt: new Date(),
     },
+    authUserId: "supervisor@csm.com", // Plain login: Password123 - Linked to auth-service SUPERVISOR user
     createdBy: "seed-script",
   },
   {
@@ -64,6 +66,7 @@ const agents = [
       lastActiveAt: new Date(),
       lastUpdatedAt: new Date(),
     },
+    authUserId: "agent@csm.com", // Plain login: Password123 - Linked to auth-service AGENT user
     createdBy: "seed-script",
   },
   {
@@ -84,6 +87,7 @@ const agents = [
       lastActiveAt: null,
       lastUpdatedAt: new Date(),
     },
+    authUserId: "test@csm.com", // Plain login: Test@123 - Linked to auth-service test user
     createdBy: "seed-script",
   },
 ];
@@ -105,7 +109,9 @@ async function seedAgents() {
 
     console.log("\nSeeded agents:");
     agents.forEach((agent, index) => {
-      console.log(`${index + 1}) ${agent.firstName} ${agent.lastName} - ${agent.role}`);
+      console.log(
+        `${index + 1}) ${agent.firstName} ${agent.lastName} - ${agent.role} (authUserId: ${agent.authUserId})`,
+      );
     });
   } catch (error) {
     console.error(`Seed failed: ${error.message}`);

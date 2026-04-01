@@ -19,6 +19,7 @@ const customers = [
       zipCode: "11511",
     },
     status: "ACTIVE",
+    authUserId: "ahmed.hassan@example.com", // Unique for customer auth linkage
     createdBy: "seed-script",
   },
   {
@@ -34,6 +35,7 @@ const customers = [
       zipCode: "31611",
     },
     status: "ACTIVE",
+    authUserId: "mona.ali@example.com", // Unique for customer auth linkage
     createdBy: "seed-script",
   },
   {
@@ -49,6 +51,7 @@ const customers = [
       zipCode: "21500",
     },
     status: "INACTIVE",
+    authUserId: "youssef.mahmoud@example.com", // Unique for customer auth linkage
     createdBy: "seed-script",
   },
   {
@@ -64,6 +67,7 @@ const customers = [
       zipCode: "41511",
     },
     status: "ACTIVE",
+    authUserId: "sara.ibrahim@example.com", // Unique for customer auth linkage
     createdBy: "seed-script",
   },
 ];
@@ -85,7 +89,9 @@ async function seedCustomers() {
 
     console.log("\nSeeded customers:");
     customers.forEach((customer, index) => {
-      console.log(`${index + 1}) ${customer.firstName} ${customer.lastName} - ${customer.phone}`);
+      console.log(
+        `${index + 1}) ${customer.firstName} ${customer.lastName} - ${customer.phone} (authUserId: ${customer.authUserId})`,
+      );
     });
   } catch (error) {
     console.error(`Seed failed: ${error.message}`);

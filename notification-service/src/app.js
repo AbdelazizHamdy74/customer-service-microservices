@@ -10,7 +10,11 @@ const app = express();
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || env.allowedOrigins.includes("*") || env.allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      env.allowedOrigins.includes("*") ||
+      env.allowedOrigins.includes(origin)
+    ) {
       return callback(null, true);
     }
     return callback(new Error("Origin is not allowed by CORS"));
@@ -29,6 +33,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/", notificationRoutes); // For API Gateway proxy
 
 app.use(notFound);
 app.use(errorHandler);

@@ -10,28 +10,28 @@ const users = [
   {
     name: "Admin User",
     email: "admin@csm.com",
-    password: "Password123",
+    password: "Password123", // Plain password for login: Password123
     role: "ADMIN",
     isActive: true,
   },
   {
     name: "Supervisor User",
     email: "supervisor@csm.com",
-    password: "Password123",
+    password: "Password123", // Plain password for login: Password123
     role: "SUPERVISOR",
     isActive: true,
   },
   {
     name: "Agent User",
     email: "agent@csm.com",
-    password: "Password123",
+    password: "Password123", // Plain password for login: Password123
     role: "AGENT",
     isActive: true,
   },
   {
     name: "Test User",
     email: "test@csm.com",
-    password: "Test@123",
+    password: "Test@123", // Plain password for login: Test@123
     role: "AGENT",
     isActive: true,
   },

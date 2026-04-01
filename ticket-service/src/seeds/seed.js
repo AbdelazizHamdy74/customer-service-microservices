@@ -8,9 +8,10 @@ dotenv.config();
 const tickets = [
   {
     subject: "Billing issue on latest invoice",
-    description: "Customer reported an unexpected charge on the March invoice and asked for clarification.",
-    customerId: "customer-1001",
-    assignedAgentId: "agent-2001",
+    description:
+      "Customer reported an unexpected charge on the March invoice and asked for clarification.",
+    customerId: "customer-1001", // Replace with actual Customer _id after seeding customers
+    assignedAgentId: "agent-2001", // Replace with actual Agent _id after seeding agents
     status: "IN_PROGRESS",
     createdBy: "seed-script",
     lastUpdatedBy: "seed-script",
@@ -51,9 +52,10 @@ const tickets = [
   },
   {
     subject: "Unable to reset password",
-    description: "Customer cannot complete the password reset flow after receiving the email.",
-    customerId: "customer-1002",
-    assignedAgentId: "agent-2002",
+    description:
+      "Customer cannot complete the password reset flow after receiving the email.",
+    customerId: "customer-1002", // Replace with actual Customer _id after seeding customers
+    assignedAgentId: "agent-2002", // Replace with actual Agent _id after seeding agents
     status: "WAITING_CUSTOMER",
     createdBy: "seed-script",
     lastUpdatedBy: "seed-script",
@@ -61,7 +63,8 @@ const tickets = [
       {
         authorId: "agent-2002",
         authorRole: "AGENT",
-        message: "Asked customer to confirm whether the reset token was already used.",
+        message:
+          "Asked customer to confirm whether the reset token was already used.",
       },
     ],
     history: [
@@ -94,9 +97,10 @@ const tickets = [
   },
   {
     subject: "Request to reopen closed account complaint",
-    description: "Customer says the issue recurred after the last closure and needs the case reopened.",
-    customerId: "customer-1003",
-    assignedAgentId: "agent-2003",
+    description:
+      "Customer says the issue recurred after the last closure and needs the case reopened.",
+    customerId: "customer-1003", // Replace with actual Customer _id after seeding customers
+    assignedAgentId: "agent-2003", // Replace with actual Agent _id after seeding agents
     status: "CLOSED",
     createdBy: "seed-script",
     lastUpdatedBy: "seed-script",

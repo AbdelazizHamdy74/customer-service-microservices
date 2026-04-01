@@ -12,7 +12,11 @@ const app = express();
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || env.allowedOrigins.includes("*") || env.allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      env.allowedOrigins.includes("*") ||
+      env.allowedOrigins.includes(origin)
+    ) {
       return callback(null, true);
     }
     return callback(new Error("Origin is not allowed by CORS"));
@@ -36,7 +40,8 @@ app.get("/set-password", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "set-password.html"));
 });
 
-app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/auth", authRoutes); // For direct service access
+app.use(authRoutes); // For API Gateway proxy (receives only /endpoint)
 
 app.use(notFound);
 app.use(errorHandler);
