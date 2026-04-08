@@ -2,12 +2,19 @@ const Customer = require("../models/Customer");
 const { publishEvent } = require("../config/kafka");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
-const { getCache, setCache, deleteCache, deleteByPattern } = require("../utils/cache");
+const {
+  getCache,
+  setCache,
+  deleteCache,
+  deleteByPattern,
+} = require("../utils/cache");
+
 const {
   validateCreateCustomerPayload,
   validateUpdateCustomerPayload,
   buildCustomerSearchFilter,
 } = require("../utils/validators/customerValidator");
+const { createCustomerUser } = require("../utils/authUser");
 
 const STAFF_ROLES = ["ADMIN", "SUPERVISOR", "AGENT"];
 const ADMIN_ROLES = ["ADMIN", "SUPERVISOR"];
@@ -15,13 +22,16 @@ const ADMIN_ROLES = ["ADMIN", "SUPERVISOR"];
 const isStaff = (user) => STAFF_ROLES.includes(user?.role);
 const isAdmin = (user) => ADMIN_ROLES.includes(user?.role);
 const isSelfCustomer = (user, customerId) =>
-  user?.userType === "CUSTOMER" && user?.linkedId && user.linkedId === customerId;
+  user?.userType === "CUSTOMER" &&
+  user?.linkedId &&
+  user.linkedId === customerId;
 const buildCustomerEventPayload = (customer, extra = {}) => ({
   customerId: customer.id,
   authUserId: customer.authUserId || null,
   firstName: customer.firstName,
   lastName: customer.lastName,
-  fullName: customer.fullName || `${customer.firstName} ${customer.lastName}`.trim(),
+  fullName:
+    customer.fullName || `${customer.firstName} ${customer.lastName}`.trim(),
   email: customer.email || "",
   phone: customer.phone,
   address: customer.address,
@@ -47,18 +57,35 @@ const createCustomer = asyncHandler(async (req, res) => {
   };
   if (req.body.status) payload.status = req.body.status.toUpperCase();
 
+  // Create the customer first
+
+  // Remove authUserId if present in payload to avoid setting it to null
+  const { authUserId, ...customerPayload } = payload;
   const customer = await Customer.create({
-    ...payload,
+    ...customerPayload,
     createdBy: req.user?.id || null,
   });
 
+  // Try to create the auth user with default password
+  if (customer.email) {
+    const authUser = await createCustomerUser(customer);
+    if (authUser && authUser.data && authUser.data.userId) {
+      customer.authUserId = authUser.data.userId;
+      await customer.save();
+    }
+  }
+
   await deleteByPattern("customer:search:*");
-  await publishEvent("customer.created", buildCustomerEventPayload(customer, { createdBy: req.user?.id || null }));
+  await publishEvent(
+    "customer.created",
+    buildCustomerEventPayload(customer, { createdBy: req.user?.id || null }),
+  );
 
   res.status(201).json({
     success: true,
     message: "Customer created successfully",
     data: customer,
+    defaultPassword: customer.email ? "Customer@123" : undefined,
   });
 });
 
@@ -82,7 +109,13 @@ const updateCustomer = asyncHandler(async (req, res) => {
   if (updates.email) updates.email = updates.email.toLowerCase();
   if (updates.status) updates.status = updates.status.toUpperCase();
   if (isSelf) {
-    const allowedFields = ["firstName", "lastName", "email", "phone", "address"];
+    const allowedFields = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "address",
+    ];
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
         customer[field] = updates[field];
@@ -96,7 +129,10 @@ const updateCustomer = asyncHandler(async (req, res) => {
   await deleteCache(`customer:${customer.id}`);
   await deleteByPattern("customer:search:*");
 
-  await publishEvent("customer.updated", buildCustomerEventPayload(customer, { updatedBy: req.user?.id || null }));
+  await publishEvent(
+    "customer.updated",
+    buildCustomerEventPayload(customer, { updatedBy: req.user?.id || null }),
+  );
 
   res.status(200).json({
     success: true,
@@ -118,7 +154,10 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   await deleteCache(`customer:${customer.id}`);
   await deleteByPattern("customer:search:*");
 
-  await publishEvent("customer.deleted", buildCustomerEventPayload(customer, { deletedBy: req.user?.id || null }));
+  await publishEvent(
+    "customer.deleted",
+    buildCustomerEventPayload(customer, { deletedBy: req.user?.id || null }),
+  );
 
   res.status(200).json({
     success: true,
@@ -238,7 +277,9 @@ const createCustomerInternal = asyncHandler(async (req, res) => {
   await deleteByPattern("customer:search:*");
   await publishEvent(
     "customer.created",
-    buildCustomerEventPayload(customer, { createdBy: req.body.createdBy || "auth-service" })
+    buildCustomerEventPayload(customer, {
+      createdBy: req.body.createdBy || "auth-service",
+    }),
   );
 
   res.status(201).json({
@@ -257,7 +298,10 @@ const deleteCustomerInternal = asyncHandler(async (req, res) => {
   await deleteCache(`customer:${customer.id}`);
   await deleteByPattern("customer:search:*");
 
-  await publishEvent("customer.deleted", buildCustomerEventPayload(customer, { deletedBy: "auth-service" }));
+  await publishEvent(
+    "customer.deleted",
+    buildCustomerEventPayload(customer, { deletedBy: "auth-service" }),
+  );
 
   res.status(200).json({
     success: true,

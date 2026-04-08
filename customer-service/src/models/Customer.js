@@ -39,7 +39,6 @@ const customerSchema = new mongoose.Schema(
     },
     authUserId: {
       type: String,
-      default: null,
       unique: true,
       sparse: true,
       index: true,
@@ -53,7 +52,7 @@ const customerSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 customerSchema.index({

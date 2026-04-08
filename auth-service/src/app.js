@@ -6,6 +6,7 @@ const path = require("path");
 
 const env = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
+const internalRoutes = require("./routes/internalRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -40,6 +41,7 @@ app.get("/set-password", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "set-password.html"));
 });
 
+app.use("/api/v1/internal", internalRoutes); // Internal service-to-service endpoints
 app.use("/api/v1/auth", authRoutes); // For direct service access
 app.use(authRoutes); // For API Gateway proxy (receives only /endpoint)
 
