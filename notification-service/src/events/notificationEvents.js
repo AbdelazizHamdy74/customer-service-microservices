@@ -1,6 +1,7 @@
 const logger = require("../utils/logger");
 const { buildNotificationsFromEvent } = require("../services/eventNotificationFactory");
 const { createManyNotifications } = require("../services/notificationService");
+const { enrichNotificationsForDelivery } = require("../services/recipientEnrichment");
 
 const handleEventNotification = async (topic, payload) => {
   const notifications = buildNotificationsFromEvent(topic, payload);
@@ -9,6 +10,7 @@ const handleEventNotification = async (topic, payload) => {
     return;
   }
 
+  await enrichNotificationsForDelivery(notifications);
   await createManyNotifications(notifications);
   logger.info(`Stored ${notifications.length} notification(s) for topic ${topic}`);
 };

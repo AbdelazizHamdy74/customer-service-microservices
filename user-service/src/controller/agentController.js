@@ -362,6 +362,24 @@ const deleteAgentInternal = asyncHandler(async (req, res) => {
   });
 });
 
+const getAgentInternal = asyncHandler(async (req, res) => {
+  const agent = await Agent.findById(req.params.id);
+  if (!agent) {
+    throw new ApiError(404, "Agent not found");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Agent fetched successfully",
+    data: {
+      id: agent.id,
+      email: agent.email || "",
+      firstName: agent.firstName,
+      lastName: agent.lastName,
+    },
+  });
+});
+
 module.exports = {
   createAgent,
   updateAgent,
@@ -372,4 +390,5 @@ module.exports = {
   agentPerformance,
   createAgentInternal,
   deleteAgentInternal,
+  getAgentInternal,
 };

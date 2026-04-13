@@ -56,4 +56,6 @@ module.exports = {
   smsProvider: (process.env.SMS_PROVIDER || "mock").toUpperCase(),
   smsFrom: process.env.SMS_FROM || "",
   allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS),
+  userServiceUrl: (process.env.USER_SERVICE_URL || "").trim(),
+  internalServiceKey: (process.env.INTERNAL_SERVICE_KEY || "").trim(),
 };

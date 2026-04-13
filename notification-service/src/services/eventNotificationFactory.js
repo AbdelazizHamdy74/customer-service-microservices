@@ -357,6 +357,7 @@ const buildNotificationsFromEvent = (topic, payload = {}) => {
         notifications.push(
           buildEventBase(topic, payload, {
             category: "TICKET",
+            channels: ["IN_APP", "EMAIL"],
             title: "Ticket Assigned",
             message: payload.subject
               ? `Ticket "${payload.subject}" has been assigned to you.`
@@ -373,6 +374,7 @@ const buildNotificationsFromEvent = (topic, payload = {}) => {
         notifications.push(
           buildEventBase(topic, payload, {
             category: "TICKET",
+            channels: ["IN_APP", "EMAIL"],
             title: "Ticket Reassigned",
             message: payload.subject
               ? `Ticket "${payload.subject}" was reassigned to another agent.`
