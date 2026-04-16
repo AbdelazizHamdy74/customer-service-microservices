@@ -1,7 +1,9 @@
 const Agent = require("../models/Agent");
+const env = require("../config/env");
 const { publishEvent } = require("../config/kafka");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
+const { provisionAuthUser } = require("../utils/provisionAuthUser");
 const { getCache, setCache, deleteCache, deleteByPattern } = require("../utils/cache");
 const {
   validateCreateAgentPayload,
@@ -62,8 +64,19 @@ const createAgent = asyncHandler(async (req, res) => {
   };
   if (payload.role) payload.role = payload.role.toUpperCase();
   if (payload.status) payload.status = payload.status.toUpperCase();
+  if (payload.authUserId == null || String(payload.authUserId).trim() === "") {
+    delete payload.authUserId;
+  }
 
-  const agent = await Agent.create(payload);
+  let agent = await Agent.create(payload);
+
+  if (env.authServiceUrl && agent.email) {
+    const authUserId = await provisionAuthUser(env, agent);
+    if (authUserId) {
+      agent.authUserId = authUserId;
+      await agent.save();
+    }
+  }
 
   await deleteByPattern("agent:list:*");
 
@@ -380,6 +393,22 @@ const getAgentInternal = asyncHandler(async (req, res) => {
   });
 });
 
+/** Round-robin pool: active profiles with role AGENT only */
+const getAssignableAgentIds = asyncHandler(async (req, res) => {
+  const agents = await Agent.find({ status: "ACTIVE", role: "AGENT" })
+    .select("_id")
+    .sort({ createdAt: 1 })
+    .lean();
+
+  const ids = agents.map((a) => String(a._id));
+
+  res.status(200).json({
+    success: true,
+    message: "Assignable agents fetched",
+    data: { ids },
+  });
+});
+
 module.exports = {
   createAgent,
   updateAgent,
@@ -391,4 +420,5 @@ module.exports = {
   createAgentInternal,
   deleteAgentInternal,
   getAgentInternal,
+  getAssignableAgentIds,
 };

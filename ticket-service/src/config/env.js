@@ -33,4 +33,8 @@ module.exports = {
   kafkaBrokers: process.env.KAFKA_BROKERS.split(",").map((broker) => broker.trim()),
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
   allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS),
+  /** Same key as user-service `INTERNAL_SERVICE_KEY` for service-to-service calls */
+  internalServiceKey: (process.env.INTERNAL_SERVICE_KEY || "").trim(),
+  userServiceUrl: (process.env.USER_SERVICE_URL || "").trim(),
+  autoAssignTickets: String(process.env.AUTO_ASSIGN_TICKETS || "").toLowerCase() === "true",
 };

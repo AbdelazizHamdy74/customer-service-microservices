@@ -82,12 +82,13 @@ const agentSchema = new mongoose.Schema(
         default: null,
       },
     },
+    // No default: storing null would collide on unique index (only one null allowed).
+    // Omit the field until an auth user is linked.
     authUserId: {
       type: String,
-      default: null,
-      unique: true,
+      trim: true,
       sparse: true,
-      index: true,
+      unique: true,
     },
     createdBy: {
       type: String,

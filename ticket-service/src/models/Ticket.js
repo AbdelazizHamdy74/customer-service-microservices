@@ -92,6 +92,17 @@ const ticketSchema = new mongoose.Schema(
       default: "OPEN",
       index: true,
     },
+    priority: {
+      type: String,
+      enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      default: "MEDIUM",
+      index: true,
+    },
+    slaDueAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     comments: [ticketCommentSchema],
     history: [ticketHistorySchema],
     createdBy: {

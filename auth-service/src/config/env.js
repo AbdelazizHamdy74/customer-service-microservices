@@ -42,4 +42,6 @@ module.exports = {
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:4200",
   allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS || process.env.FRONTEND_URL),
+  /** Used when admin/supervisor invites an agent (auth invite flow). Override in production. */
+  defaultAgentInvitePassword: process.env.DEFAULT_AGENT_INVITE_PASSWORD || "password123",
 };

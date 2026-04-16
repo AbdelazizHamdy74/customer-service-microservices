@@ -6,6 +6,7 @@ const { getRedisClient } = require("../config/redis");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
+const logger = require("../utils/logger");
 const { createAccessToken, createRefreshToken, verifyToken } = require("../utils/token");
 const { generateRandomToken, sha256 } = require("../utils/crypto");
 const {
@@ -61,8 +62,15 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email: req.body.email.toLowerCase() }).select("+password");
-  if (!user || !user.isActive) {
+  if (!user) {
     throw new ApiError(401, "Invalid credentials");
+  }
+
+  if (!user.isActive) {
+    throw new ApiError(
+      401,
+      "Account is inactive. Open the invite email to set your password, or ask an administrator to activate the account.",
+    );
   }
 
   const isMatch = await user.comparePassword(req.body.password);
@@ -122,18 +130,28 @@ const inviteCustomer = asyncHandler(async (req, res) => {
   user.resetPasswordExpires = new Date(Date.now() + INVITE_TOKEN_TTL_MS);
   await user.save();
 
-  await publishEvent("customer.invited", {
-    authUserId: user.id,
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    email,
-    phone: req.body.phone,
-    address: req.body.address,
-    status: "ACTIVE",
-    createdBy: req.user?.id || null,
-    inviteToken: rawInviteToken,
-    inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
-  });
+  try {
+    await publishEvent("customer.invited", {
+      authUserId: user.id,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      email,
+      phone: req.body.phone,
+      address: req.body.address,
+      status: "ACTIVE",
+      createdBy: req.user?.id || null,
+      inviteToken: rawInviteToken,
+      inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
+    });
+    logger.info(`customer.invited published for ${email} (user ${user.id})`);
+  } catch (err) {
+    logger.error(`Kafka publish customer.invited failed: ${err.message}`);
+    await User.findByIdAndDelete(user._id);
+    throw new ApiError(
+      503,
+      "Invitation could not be queued. Check Kafka is running, then try again."
+    );
+  }
 
   res.status(201).json({
     success: true,
@@ -165,29 +183,39 @@ const inviteAgent = asyncHandler(async (req, res) => {
   const user = new User({
     name: `${req.body.firstName} ${req.body.lastName}`.trim(),
     email,
-    password: generateRandomToken(16),
+    password: env.defaultAgentInvitePassword,
     role,
     userType: "AGENT",
-    isActive: false,
+    isActive: true,
   });
   user.resetPasswordToken = sha256(rawInviteToken);
   user.resetPasswordExpires = new Date(Date.now() + INVITE_TOKEN_TTL_MS);
   await user.save();
 
-  await publishEvent("agent.invited", {
-    authUserId: user.id,
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    email,
-    phone: req.body.phone,
-    role,
-    status,
-    team: req.body.team,
-    skills: req.body.skills,
-    createdBy: req.user?.id || null,
-    inviteToken: rawInviteToken,
-    inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
-  });
+  try {
+    await publishEvent("agent.invited", {
+      authUserId: user.id,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      email,
+      phone: req.body.phone,
+      role,
+      status,
+      team: req.body.team,
+      skills: req.body.skills,
+      createdBy: req.user?.id || null,
+      inviteToken: rawInviteToken,
+      inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
+    });
+    logger.info(`agent.invited published for ${email} (user ${user.id})`);
+  } catch (err) {
+    logger.error(`Kafka publish agent.invited failed: ${err.message}`);
+    await User.findByIdAndDelete(user._id);
+    throw new ApiError(
+      503,
+      "Invitation could not be queued. Check Kafka is running, then try again."
+    );
+  }
 
   res.status(201).json({
     success: true,
@@ -196,6 +224,7 @@ const inviteAgent = asyncHandler(async (req, res) => {
       userId: user.id,
       inviteToken: rawInviteToken,
       inviteTokenExpiresAt: user.resetPasswordExpires.toISOString(),
+      defaultLoginPassword: env.defaultAgentInvitePassword,
     },
   });
 });

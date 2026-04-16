@@ -34,5 +34,9 @@ module.exports = {
   kafkaBrokers: process.env.KAFKA_BROKERS.split(",").map((broker) => broker.trim()),
   kafkaClientId: process.env.KAFKA_CLIENT_ID,
   internalServiceKey: process.env.INTERNAL_SERVICE_KEY,
+  /** Base URL of auth-service (e.g. http://localhost:3001) — enables login after direct "Create agent". */
+  authServiceUrl: (process.env.AUTH_SERVICE_URL || "").trim(),
+  /** Initial password for auth users created via provisionAuthUser (should match auth invite default in dev). */
+  defaultNewAgentPassword: process.env.DEFAULT_NEW_AGENT_PASSWORD || "password123",
   allowedOrigins: parseAllowedOrigins(process.env.CORS_ORIGINS),
 };

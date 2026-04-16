@@ -1,8 +1,12 @@
 const Ticket = require("../models/Ticket");
+const env = require("../config/env");
 const { publishEvent } = require("../config/kafka");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/apiError");
 const { getCache, setCache, deleteCache, deleteByPattern } = require("../utils/cache");
+const { normalizePriority, computeSlaDueAt } = require("../utils/sla");
+const { pickRoundRobinAgentId } = require("../utils/autoAssignAgent");
+const { logAudit } = require("../utils/auditLogger");
 const {
   validateCreateTicketPayload,
   validateUpdateTicketPayload,
@@ -33,6 +37,8 @@ const buildTicketEventPayload = (ticket, extra = {}) => ({
   customerId: ticket.customerId,
   assignedAgentId: ticket.assignedAgentId,
   status: ticket.status,
+  priority: ticket.priority,
+  slaDueAt: ticket.slaDueAt,
   createdBy: ticket.createdBy || null,
   lastUpdatedBy: ticket.lastUpdatedBy || null,
   createdAt: ticket.createdAt,
@@ -159,6 +165,25 @@ const createTicket = asyncHandler(async (req, res) => {
   }
 
   const status = payload.status ? payload.status.toUpperCase() : "OPEN";
+  const priority = normalizePriority(payload.priority);
+  const createdAt = new Date();
+  const slaDueAt = computeSlaDueAt(createdAt, priority);
+
+  let assignedAgentId = payload.assignedAgentId ? payload.assignedAgentId.trim() : null;
+
+  if (
+    req.user?.userType === "CUSTOMER" &&
+    env.autoAssignTickets &&
+    env.userServiceUrl &&
+    env.internalServiceKey &&
+    !assignedAgentId
+  ) {
+    const picked = await pickRoundRobinAgentId(env);
+    if (picked) {
+      assignedAgentId = picked;
+    }
+  }
+
   const history = [
     {
       action: "CREATED",
@@ -169,14 +194,14 @@ const createTicket = asyncHandler(async (req, res) => {
     },
   ];
 
-  if (payload.assignedAgentId) {
+  if (assignedAgentId) {
     history.push({
       action: "ASSIGNED",
       ...buildActor(req.user),
-      note: "Ticket assigned during creation",
+      note: payload.assignedAgentId ? "Ticket assigned during creation" : "Ticket auto-assigned",
       meta: {
         fromAssignedAgentId: null,
-        toAssignedAgentId: payload.assignedAgentId.trim(),
+        toAssignedAgentId: assignedAgentId,
       },
       createdAt: new Date(),
     });
@@ -186,14 +211,24 @@ const createTicket = asyncHandler(async (req, res) => {
     subject: payload.subject.trim(),
     description: payload.description.trim(),
     customerId: payload.customerId.trim(),
-    assignedAgentId: payload.assignedAgentId ? payload.assignedAgentId.trim() : null,
+    assignedAgentId,
     status,
+    priority,
+    slaDueAt,
     createdBy: req.user?.id || null,
     lastUpdatedBy: req.user?.id || null,
     history,
   });
 
   await invalidateTicketCaches(ticket.id);
+  await logAudit({
+    actorId: req.user?.id || null,
+    actorRole: req.user?.role || req.user?.userType || null,
+    action: "TICKET_CREATED",
+    resourceType: "ticket",
+    resourceId: String(ticket.id),
+    meta: { priority, status, customerId: ticket.customerId, assignedAgentId: ticket.assignedAgentId },
+  });
   await publishEvent("ticket.created", buildTicketEventPayload(ticket, { createdBy: req.user?.id || null }));
 
   res.status(201).json({
@@ -266,6 +301,18 @@ const updateTicket = asyncHandler(async (req, res) => {
     }
   }
 
+  if (req.body.priority !== undefined) {
+    if (!isStaff(req.user)) {
+      throw new ApiError(403, "Only staff can change priority");
+    }
+
+    const nextPriority = normalizePriority(req.body.priority);
+    if (nextPriority !== ticket.priority) {
+      updates.priority = nextPriority;
+      updates.slaDueAt = computeSlaDueAt(ticket.createdAt, nextPriority);
+    }
+  }
+
   const changedFields = Object.keys(updates);
   if (!changedFields.length) {
     return res.status(200).json({
@@ -276,6 +323,7 @@ const updateTicket = asyncHandler(async (req, res) => {
   }
 
   const previousStatus = ticket.status;
+  const previousPriority = ticket.priority;
   Object.assign(ticket, updates);
   ticket.lastUpdatedBy = req.user?.id || null;
 
@@ -287,7 +335,16 @@ const updateTicket = asyncHandler(async (req, res) => {
     });
   }
 
-  const nonStatusFields = changedFields.filter((field) => field !== "status");
+  if (updates.priority) {
+    appendHistory(ticket, "PRIORITY_CHANGED", req.user, {
+      note: `Priority changed to ${updates.priority}`,
+      meta: { fromPriority: previousPriority, toPriority: updates.priority },
+    });
+  }
+
+  const nonStatusFields = changedFields.filter(
+    (field) => field !== "status" && field !== "slaDueAt" && field !== "priority"
+  );
   if (nonStatusFields.length) {
     appendHistory(ticket, "UPDATED", req.user, {
       note: "Ticket updated",
@@ -297,6 +354,15 @@ const updateTicket = asyncHandler(async (req, res) => {
 
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
+
+  await logAudit({
+    actorId: req.user?.id || null,
+    actorRole: req.user?.role || req.user?.userType || null,
+    action: "TICKET_UPDATED",
+    resourceType: "ticket",
+    resourceId: String(ticket.id),
+    meta: { changedFields },
+  });
 
   await publishEvent(
     "ticket.updated",
@@ -350,6 +416,18 @@ const assignTicket = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
+  await logAudit({
+    actorId: req.user?.id || null,
+    actorRole: req.user?.role || req.user?.userType || null,
+    action: "TICKET_ASSIGNED",
+    resourceType: "ticket",
+    resourceId: String(ticket.id),
+    meta: {
+      fromAssignedAgentId: previousAssignedAgentId,
+      toAssignedAgentId: nextAssignedAgentId,
+    },
+  });
+
   await publishEvent(
     "ticket.assigned",
     buildTicketEventPayload(ticket, {
@@ -399,6 +477,15 @@ const closeTicket = asyncHandler(async (req, res) => {
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
 
+  await logAudit({
+    actorId: req.user?.id || null,
+    actorRole: req.user?.role || req.user?.userType || null,
+    action: "TICKET_CLOSED",
+    resourceType: "ticket",
+    resourceId: String(ticket.id),
+    meta: { previousStatus },
+  });
+
   await publishEvent(
     "ticket.closed",
     buildTicketEventPayload(ticket, {
@@ -447,6 +534,15 @@ const reopenTicket = asyncHandler(async (req, res) => {
 
   await ticket.save();
   await invalidateTicketCaches(ticket.id);
+
+  await logAudit({
+    actorId: req.user?.id || null,
+    actorRole: req.user?.role || req.user?.userType || null,
+    action: "TICKET_REOPENED",
+    resourceType: "ticket",
+    resourceId: String(ticket.id),
+    meta: { previousStatus },
+  });
 
   await publishEvent(
     "ticket.reopened",

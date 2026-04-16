@@ -1,5 +1,6 @@
 const TICKET_STATUSES = ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED"];
 const MUTABLE_STATUSES = ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED"];
+const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 const isValidDate = (value) => !Number.isNaN(Date.parse(value));
@@ -34,6 +35,14 @@ const validateCreateTicketPayload = (payload = {}) => {
     errors.push(`status must be one of: ${MUTABLE_STATUSES.join(", ")}`);
   }
 
+  if (
+    payload.priority !== undefined &&
+    payload.priority !== null &&
+    (!isNonEmptyString(payload.priority) || !PRIORITIES.includes(String(payload.priority).trim().toUpperCase()))
+  ) {
+    errors.push(`priority must be one of: ${PRIORITIES.join(", ")}`);
+  }
+
   return errors;
 };
 
@@ -60,6 +69,14 @@ const validateUpdateTicketPayload = (payload = {}) => {
     (!isNonEmptyString(payload.status) || !MUTABLE_STATUSES.includes(payload.status.toUpperCase()))
   ) {
     errors.push(`status must be one of: ${MUTABLE_STATUSES.join(", ")}`);
+  }
+
+  if (
+    payload.priority !== undefined &&
+    payload.priority !== null &&
+    (!isNonEmptyString(payload.priority) || !PRIORITIES.includes(String(payload.priority).trim().toUpperCase()))
+  ) {
+    errors.push(`priority must be one of: ${PRIORITIES.join(", ")}`);
   }
 
   return errors;
@@ -150,10 +167,39 @@ const validateFilterTicketsQuery = (query = {}) => {
     errors.push("toDate must be a valid date");
   }
 
+  if (query.priority !== undefined && String(query.priority).trim()) {
+    const priorities = String(query.priority)
+      .split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    if (priorities.some((p) => !PRIORITIES.includes(p))) {
+      errors.push(`priority must be one of: ${PRIORITIES.join(", ")}`);
+    }
+  }
+
+  if (
+    query.overdue !== undefined &&
+    String(query.overdue).trim() !== "" &&
+    !["true", "false", "1", "0"].includes(String(query.overdue).toLowerCase())
+  ) {
+    errors.push("overdue must be true or false");
+  }
+
   return errors;
 };
 
-const buildTicketFilter = ({ q, status, customerId, assignedAgentId, createdBy, fromDate, toDate, unassigned }) => {
+const buildTicketFilter = ({
+  q,
+  status,
+  customerId,
+  assignedAgentId,
+  createdBy,
+  fromDate,
+  toDate,
+  unassigned,
+  priority,
+  overdue,
+}) => {
   const andConditions = [];
 
   if (q) {
@@ -196,6 +242,25 @@ const buildTicketFilter = ({ q, status, customerId, assignedAgentId, createdBy, 
     });
   }
 
+  if (priority) {
+    const priorities = String(priority)
+      .split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    if (priorities.length === 1) {
+      andConditions.push({ priority: priorities[0] });
+    } else if (priorities.length > 1) {
+      andConditions.push({ priority: { $in: priorities } });
+    }
+  }
+
+  if (["true", "1"].includes(String(overdue).toLowerCase())) {
+    andConditions.push({
+      $and: [{ slaDueAt: { $ne: null } }, { slaDueAt: { $lt: new Date() } }],
+      status: { $nin: ["RESOLVED", "CLOSED"] },
+    });
+  }
+
   const createdAt = {};
   if (fromDate) {
     createdAt.$gte = new Date(fromDate);
@@ -215,6 +280,7 @@ const buildTicketFilter = ({ q, status, customerId, assignedAgentId, createdBy, 
 
 module.exports = {
   TICKET_STATUSES,
+  PRIORITIES,
   validateCreateTicketPayload,
   validateUpdateTicketPayload,
   validateAssignTicketPayload,
